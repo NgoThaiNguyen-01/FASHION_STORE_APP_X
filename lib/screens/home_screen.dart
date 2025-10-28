@@ -13,6 +13,7 @@ import '../database/db_helper.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'account_screen.dart';
+import 'admin/admin_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String fullName;
@@ -47,7 +48,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<XFile> _pickedImages = [];
   final List<String> _availableSizes = ['S', 'M', 'L', 'XL', 'XXL'];
   final List<String> _availableColors = [
-    'Đen', 'Trắng', 'Xám', 'Đỏ', 'Xanh dương', 'Xanh lá', 'Vàng', 'Nâu'
+    'Đen',
+    'Trắng',
+    'Xám',
+    'Đỏ',
+    'Xanh dương',
+    'Xanh lá',
+    'Vàng',
+    'Nâu',
   ];
 
   @override
@@ -135,8 +143,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setLocal(() => _pickedImages.addAll(imgs));
       }
     } on PlatformException catch (e) {
-      _showNotification('Không thể mở thư viện ảnh: ${e.message}',
-          isSuccess: false);
+      _showNotification(
+        'Không thể mở thư viện ảnh: ${e.message}',
+        isSuccess: false,
+      );
     } catch (e) {
       _showNotification('Lỗi khi chọn ảnh: $e', isSuccess: false);
     }
@@ -160,7 +170,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickFromDownloads(
-      void Function(void Function()) setLocal) async {
+    void Function(void Function()) setLocal,
+  ) async {
     try {
       final res = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -175,8 +186,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setLocal(() => _pickedImages.addAll(files));
       }
     } on PlatformException catch (e) {
-      _showNotification('Không mở được thư mục Tải xuống: ${e.message}',
-          isSuccess: false);
+      _showNotification(
+        'Không mở được thư mục Tải xuống: ${e.message}',
+        isSuccess: false,
+      );
     } catch (e) {
       _showNotification('Lỗi chọn ảnh: $e', isSuccess: false);
     }
@@ -213,7 +226,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // ======= ĐỊNH DẠNG GIÁ (duy nhất) =======
   String _formatPrice(double price) {
     final fmt = NumberFormat.currency(
-        locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+      locale: 'vi_VN',
+      symbol: '₫',
+      decimalDigits: 0,
+    );
     return fmt.format(price);
   }
 
@@ -222,8 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final discount = int.tryParse(discountStr) ?? 0;
     if (basePrice <= 0) return 0;
     if (discount < 0 || discount > 100) return basePrice;
-    return double.parse(
-        (basePrice * (1 - discount / 100)).toStringAsFixed(2));
+    return double.parse((basePrice * (1 - discount / 100)).toStringAsFixed(2));
   }
 
   // ======= CRUD DANH MỤC =======
@@ -238,9 +253,9 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-                controller: nameCtrl,
-                decoration:
-                const InputDecoration(labelText: 'Tên danh mục *')),
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Tên danh mục *'),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
@@ -251,14 +266,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) {
-                _showNotification('Vui lòng nhập tên danh mục!',
-                    isSuccess: false);
+                _showNotification(
+                  'Vui lòng nhập tên danh mục!',
+                  isSuccess: false,
+                );
                 return;
               }
               await DBHelper.addCategory(name, descCtrl.text.trim());
@@ -285,9 +303,9 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-                controller: nameCtrl,
-                decoration:
-                const InputDecoration(labelText: 'Tên danh mục *')),
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Tên danh mục *'),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
@@ -298,18 +316,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) {
-                _showNotification('Tên danh mục không được để trống!',
-                    isSuccess: false);
+                _showNotification(
+                  'Tên danh mục không được để trống!',
+                  isSuccess: false,
+                );
                 return;
               }
               await DBHelper.updateCategory(
-                  cat['id'], name, descCtrl.text.trim());
+                cat['id'],
+                name,
+                descCtrl.text.trim(),
+              );
               if (!mounted) return;
               Navigator.pop(context);
               await _loadCategories();
@@ -328,14 +352,15 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => AlertDialog(
         title: const Text('Xác nhận xóa'),
         content: const Text(
-            'Bạn có chắc muốn xóa danh mục này? Tất cả sản phẩm trong danh mục cũng sẽ bị xóa.'),
+          'Bạn có chắc muốn xóa danh mục này? Tất cả sản phẩm trong danh mục cũng sẽ bị xóa.',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xóa'),
           ),
@@ -358,15 +383,17 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(cat['name'],
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              cat['name'],
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.edit, color: Colors.blue),
@@ -396,15 +423,14 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Xóa sản phẩm'),
-        content:
-        const Text('Bạn có chắc muốn xóa sản phẩm này?'),
+        content: const Text('Bạn có chắc muốn xóa sản phẩm này?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xóa'),
           ),
@@ -419,8 +445,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSaleDialog(Map<String, dynamic> product) {
-    final discountCtrl =
-    TextEditingController(text: (product['discount'] ?? 0).toString());
+    final discountCtrl = TextEditingController(
+      text: (product['discount'] ?? 0).toString(),
+    );
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -429,12 +456,15 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: discountCtrl,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-              labelText: 'Phần trăm giảm giá', suffixText: '%'),
+            labelText: 'Phần trăm giảm giá',
+            suffixText: '%',
+          ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final discount = int.tryParse(discountCtrl.text) ?? 0;
@@ -455,7 +485,8 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -470,8 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading:
-              const Icon(Icons.local_offer, color: Colors.orange),
+              leading: const Icon(Icons.local_offer, color: Colors.orange),
               title: const Text('Thiết lập giảm giá'),
               onTap: () {
                 Navigator.pop(context);
@@ -496,22 +526,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _clearPickedImages();
     final isEditing = product != null;
     final nameCtrl = TextEditingController(text: product?['name'] ?? '');
-    final oldPriceCtrl =
-    TextEditingController(text: product?['oldPrice']?.toString() ?? '');
-    final descCtrl =
-    TextEditingController(text: product?['description'] ?? '');
-    final materialCtrl =
-    TextEditingController(text: product?['material']?.toString() ?? '');
-    final quantityCtrl =
-    TextEditingController(text: product?['quantity']?.toString() ?? '0');
-    final discountCtrl =
-    TextEditingController(text: product?['discount']?.toString() ?? '0');
+    final oldPriceCtrl = TextEditingController(
+      text: product?['oldPrice']?.toString() ?? '',
+    );
+    final descCtrl = TextEditingController(text: product?['description'] ?? '');
+    final materialCtrl = TextEditingController(
+      text: product?['material']?.toString() ?? '',
+    );
+    final quantityCtrl = TextEditingController(
+      text: product?['quantity']?.toString() ?? '0',
+    );
+    final discountCtrl = TextEditingController(
+      text: product?['discount']?.toString() ?? '0',
+    );
 
     // Load existing images nếu sửa
     if (isEditing && product!['images'] != null) {
       try {
-        final existingImages =
-        List<String>.from(jsonDecode(product['images']));
+        final existingImages = List<String>.from(jsonDecode(product['images']));
         for (var imagePath in existingImages) {
           if (imagePath.startsWith('/')) {
             _pickedImages.add(XFile(imagePath));
@@ -520,7 +552,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (_) {}
     }
 
-    int? selectedCatId = product?['categoryId'] ??
+    int? selectedCatId =
+        product?['categoryId'] ??
         selectedCategoryId ??
         (categories.isNotEmpty ? categories.first['id'] : null);
     int status = product?['status'] ?? 1;
@@ -557,9 +590,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextField(
-                          controller: nameCtrl,
-                          decoration: const InputDecoration(
-                              labelText: 'Tên sản phẩm *')),
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Tên sản phẩm *',
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -568,7 +603,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               controller: oldPriceCtrl,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                  labelText: 'Giá gốc *'),
+                                labelText: 'Giá gốc *',
+                              ),
                               onChanged: (_) => setLocal(() {}),
                             ),
                           ),
@@ -578,7 +614,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               controller: discountCtrl,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                  labelText: 'Giảm giá %'),
+                                labelText: 'Giảm giá %',
+                              ),
                               onChanged: (_) => setLocal(() {}),
                             ),
                           ),
@@ -588,51 +625,66 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8)),
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Giá sau giảm:'),
                             Text(
-                              _formatPrice(_calculateCurrentPrice(
-                                  oldPriceCtrl.text, discountCtrl.text)),
+                              _formatPrice(
+                                _calculateCurrentPrice(
+                                  oldPriceCtrl.text,
+                                  discountCtrl.text,
+                                ),
+                              ),
                               style: const TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                          controller: quantityCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                              labelText: 'Số lượng *')),
+                        controller: quantityCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Số lượng *',
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
                         value: selectedCatId,
-                        decoration:
-                        const InputDecoration(labelText: 'Danh mục *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Danh mục *',
+                        ),
                         items: categories
-                            .map((c) => DropdownMenuItem<int>(
-                            value: c['id'], child: Text(c['name'])))
+                            .map(
+                              (c) => DropdownMenuItem<int>(
+                                value: c['id'],
+                                child: Text(c['name']),
+                              ),
+                            )
                             .toList(),
                         onChanged: (v) => setLocal(() => selectedCatId = v),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
                         value: status,
-                        decoration:
-                        const InputDecoration(labelText: 'Trạng thái *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Trạng thái *',
+                        ),
                         items: const [
                           DropdownMenuItem(value: 0, child: Text('Hết hàng')),
                           DropdownMenuItem(value: 1, child: Text('Còn hàng')),
                           DropdownMenuItem(
-                              value: 2, child: Text('Đang nhập hàng')),
+                            value: 2,
+                            child: Text('Đang nhập hàng'),
+                          ),
                         ],
                         onChanged: (v) => setLocal(() => status = v!),
                       ),
@@ -641,16 +693,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         controller: descCtrl,
                         maxLines: 2,
                         decoration: const InputDecoration(
-                            labelText: 'Mô tả sản phẩm',
-                            border: OutlineInputBorder()),
+                          labelText: 'Mô tả sản phẩm',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 12),
 
                       // Size
                       const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Chọn size có sẵn:',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Chọn size có sẵn:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       Wrap(
                         spacing: 8,
                         children: _availableSizes.map((size) {
@@ -672,14 +728,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // Color
                       const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Chọn màu có sẵn:',
-                              style: TextStyle(fontWeight: FontWeight.bold))),
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Chọn màu có sẵn:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       Wrap(
                         spacing: 8,
                         children: _availableColors.map((color) {
-                          final isSelected =
-                          selectedColors.contains(color);
+                          final isSelected = selectedColors.contains(color);
                           return FilterChip(
                             label: Text(color),
                             selected: isSelected,
@@ -697,16 +755,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(
                         children: [
                           Expanded(
-                              child: TextField(
-                                  controller: customColorCtrl,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Thêm màu khác'))),
+                            child: TextField(
+                              controller: customColorCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Thêm màu khác',
+                              ),
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           ElevatedButton(
                             onPressed: () {
                               final c = customColorCtrl.text.trim();
-                              if (c.isNotEmpty &&
-                                  !selectedColors.contains(c)) {
+                              if (c.isNotEmpty && !selectedColors.contains(c)) {
                                 setLocal(() {
                                   selectedColors.add(c);
                                   customColorCtrl.clear();
@@ -721,9 +781,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // Material
                       TextField(
-                          controller: materialCtrl,
-                          decoration: const InputDecoration(
-                              labelText: 'Chất liệu')),
+                        controller: materialCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Chất liệu',
+                        ),
+                      ),
                       const SizedBox(height: 12),
 
                       // Ảnh
@@ -752,14 +814,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () => _pickFromDownloads(setLocal),
                           icon: const Icon(Icons.download),
-                          label:
-                          const Text('Chọn từ thư mục Tải xuống'),
+                          label: const Text('Chọn từ thư mục Tải xuống'),
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(_pickedImages.isEmpty
-                          ? 'Chưa chọn ảnh'
-                          : 'Đã chọn ${_pickedImages.length} ảnh'),
+                      Text(
+                        _pickedImages.isEmpty
+                            ? 'Chưa chọn ảnh'
+                            : 'Đã chọn ${_pickedImages.length} ảnh',
+                      ),
                       const SizedBox(height: 8),
                       if (_pickedImages.isNotEmpty)
                         Column(
@@ -767,12 +830,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             Container(
                               width: double.infinity,
                               height: 200,
-                              margin:
-                              const EdgeInsets.symmetric(vertical: 8),
+                              margin: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                  border:
-                                  Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(8)),
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.file(
@@ -788,14 +850,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 scrollDirection: Axis.horizontal,
                                 itemCount: _pickedImages.length,
                                 separatorBuilder: (_, __) =>
-                                const SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                 itemBuilder: (context, index) {
                                   final image = _pickedImages[index];
                                   return GestureDetector(
                                     onTap: () {
                                       setLocal(() {
-                                        final temp = _pickedImages
-                                            .removeAt(index);
+                                        final temp = _pickedImages.removeAt(
+                                          index,
+                                        );
                                         _pickedImages.insert(0, temp);
                                       });
                                     },
@@ -805,16 +868,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                           decoration: BoxDecoration(
                                             border: index == 0
                                                 ? Border.all(
-                                                color: Colors
-                                                    .redAccent,
-                                                width: 2)
+                                                    color: Colors.redAccent,
+                                                    width: 2,
+                                                  )
                                                 : null,
-                                            borderRadius:
-                                            BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
                                           child: ClipRRect(
-                                            borderRadius:
-                                            BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                             child: Image.file(
                                               File(image.path),
                                               width: 80,
@@ -829,17 +894,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                             top: 0,
                                             right: 0,
                                             child: InkWell(
-                                              onTap: () => setLocal(() =>
-                                                  _pickedImages
-                                                      .removeAt(index)),
+                                              onTap: () => setLocal(
+                                                () => _pickedImages.removeAt(
+                                                  index,
+                                                ),
+                                              ),
                                               child: Container(
-                                                padding:
-                                                const EdgeInsets.all(2),
-                                                decoration:
-                                                const BoxDecoration(
-                                                    color: Colors.red,
-                                                    shape:
-                                                    BoxShape.circle),
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.red,
+                                                  shape: BoxShape.circle,
+                                                ),
                                                 child: const Icon(
                                                   Icons.close,
                                                   size: 14,
@@ -854,18 +921,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                             right: 0,
                                             child: Container(
                                               padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 6,
-                                                  vertical: 2),
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                  color: Colors.redAccent,
-                                                  borderRadius:
-                                                  BorderRadius
-                                                      .circular(4)),
-                                              child: const Text('Chính',
-                                                  style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 10)),
+                                                color: Colors.redAccent,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'Chính',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                       ],
@@ -908,27 +979,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       oldPriceText.isEmpty ||
                       selectedCatId == null ||
                       quantityText.isEmpty) {
-                    _showNotification('Vui lòng nhập đầy đủ thông tin bắt buộc (*)',
-                        isSuccess: false);
+                    _showNotification(
+                      'Vui lòng nhập đầy đủ thông tin bắt buộc (*)',
+                      isSuccess: false,
+                    );
                     return;
                   }
                   final oldPrice = double.tryParse(oldPriceText);
                   final quantity = int.tryParse(quantityText);
                   if (oldPrice == null || oldPrice <= 0) {
-                    _showNotification('Giá gốc không hợp lệ!',
-                        isSuccess: false);
+                    _showNotification(
+                      'Giá gốc không hợp lệ!',
+                      isSuccess: false,
+                    );
                     return;
                   }
                   if (quantity == null || quantity < 0) {
-                    _showNotification('Số lượng không hợp lệ!',
-                        isSuccess: false);
+                    _showNotification(
+                      'Số lượng không hợp lệ!',
+                      isSuccess: false,
+                    );
                     return;
                   }
-                  final discount =
-                      int.tryParse(discountCtrl.text.trim()) ?? 0;
+                  final discount = int.tryParse(discountCtrl.text.trim()) ?? 0;
                   if (discount < 0 || discount > 100) {
-                    _showNotification('Giảm giá phải từ 0-100%!',
-                        isSuccess: false);
+                    _showNotification(
+                      'Giảm giá phải từ 0-100%!',
+                      isSuccess: false,
+                    );
                     return;
                   }
 
@@ -939,11 +1017,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_pickedImages.isNotEmpty) {
                     images = await _persistPickedImages();
                   } else if (isEditing && product!['images'] != null) {
-                    images =
-                    List<String>.from(jsonDecode(product['images']));
+                    images = List<String>.from(jsonDecode(product['images']));
                   } else {
                     images = [
-                      'assets/images/anh_macdinh_sanpham_chuachonanh.png'
+                      'assets/images/anh_macdinh_sanpham_chuachonanh.png',
                     ];
                   }
 
@@ -971,9 +1048,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.pop(context);
                   _clearPickedImages();
                   await _reloadProducts();
-                  _showNotification(isEditing
-                      ? 'Đã cập nhật sản phẩm!'
-                      : 'Đã thêm sản phẩm mới!');
+                  _showNotification(
+                    isEditing
+                        ? 'Đã cập nhật sản phẩm!'
+                        : 'Đã thêm sản phẩm mới!',
+                  );
                 },
                 child: Text(isEditing ? 'Cập nhật' : 'Thêm'),
               ),
@@ -1001,8 +1080,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (searchQuery.isNotEmpty) {
       final q = searchQuery.toLowerCase();
-      list = list.where((p) =>
-          (p['name'] ?? '').toString().toLowerCase().contains(q));
+      list = list.where(
+        (p) => (p['name'] ?? '').toString().toLowerCase().contains(q),
+      );
     }
     return list.toList();
   }
@@ -1010,24 +1090,25 @@ class _HomeScreenState extends State<HomeScreen> {
   // ======= UI =======
   @override
   Widget build(BuildContext context) {
+    // Nếu là admin, chuyển qua màn hình quản lý riêng
+    if (widget.isAdmin) {
+      return AdminHomeScreen(fullName: widget.fullName, userId: widget.userId);
+    }
+
+    // Giao diện cho người dùng thường
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
       body: _buildCurrentScreen(),
-      floatingActionButton: widget.isAdmin && _currentIndex == 0
-          ? FloatingActionButton(
-        onPressed: () => _showAddProductDialog(),
-        backgroundColor: Colors.redAccent,
-        child: const Icon(Icons.add, color: Colors.white),
-      )
-          : null,
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
-    const baseStyle =
-    TextStyle(fontWeight: FontWeight.bold, color: Colors.black87);
+    const baseStyle = TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Colors.black87,
+    );
     final title = switch (_currentIndex) {
       0 => 'Trang chủ',
       1 => 'Giỏ hàng',
@@ -1042,13 +1123,15 @@ class _HomeScreenState extends State<HomeScreen> {
       title: Text(title, style: baseStyle),
       actions: _currentIndex == 0
           ? [
-        IconButton(
-          icon: const Icon(Icons.shopping_bag_outlined,
-              color: Colors.black87),
-          onPressed: () => setState(() => _currentIndex = 1),
-          tooltip: 'Giỏ hàng',
-        ),
-      ]
+              IconButton(
+                icon: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: Colors.black87,
+                ),
+                onPressed: () => setState(() => _currentIndex = 1),
+                tooltip: 'Giỏ hàng',
+              ),
+            ]
           : null,
     );
   }
@@ -1062,7 +1145,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return _buildWishlistScreen();
       case 3:
-      // Tải thông tin người dùng hiện tại từ database
+        // Tải thông tin người dùng hiện tại từ database
         return FutureBuilder<Map<String, dynamic>?>(
           future: DBHelper.getUserById(widget.userId),
           builder: (context, snapshot) {
@@ -1070,11 +1153,15 @@ class _HomeScreenState extends State<HomeScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text('Lỗi khi tải tài khoản: ${snapshot.error}'));
+              return Center(
+                child: Text('Lỗi khi tải tài khoản: ${snapshot.error}'),
+              );
             }
             final user = snapshot.data;
             if (user == null) {
-              return const Center(child: Text('Không tìm thấy thông tin người dùng'));
+              return const Center(
+                child: Text('Không tìm thấy thông tin người dùng'),
+              );
             }
             return AccountScreen(user: user);
           },
@@ -1123,16 +1210,20 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Icon(Icons.shopping_cart, size: 80, color: Colors.grey[400]),
         const SizedBox(height: 12),
-        const Text('Giỏ hàng của bạn',
-            style:
-            TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Text(
+          'Giỏ hàng của bạn',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
-        Text('Chưa có sản phẩm nào trong giỏ',
-            style: TextStyle(color: Colors.grey[600])),
+        Text(
+          'Chưa có sản phẩm nào trong giỏ',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
         const SizedBox(height: 16),
         ElevatedButton(
-            onPressed: () => setState(() => _currentIndex = 0),
-            child: const Text('Tiếp tục mua sắm')),
+          onPressed: () => setState(() => _currentIndex = 0),
+          child: const Text('Tiếp tục mua sắm'),
+        ),
       ],
     ),
   );
@@ -1146,11 +1237,15 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.favorite_border, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 12),
-            const Text('Sản phẩm yêu thích',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text(
+              'Sản phẩm yêu thích',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text('Chưa có sản phẩm yêu thích',
-                style: TextStyle(color: Colors.grey[600])),
+            Text(
+              'Chưa có sản phẩm yêu thích',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
           ],
         ),
       );
@@ -1179,10 +1274,18 @@ class _HomeScreenState extends State<HomeScreen> {
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: imagePath.startsWith('/')
-                  ? Image.file(File(imagePath),
-                  width: 56, height: 56, fit: BoxFit.cover)
-                  : Image.asset(imagePath,
-                  width: 56, height: 56, fit: BoxFit.cover),
+                  ? Image.file(
+                      File(imagePath),
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.asset(
+                      imagePath,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    ),
             ),
             title: Text(p['name'] ?? ''),
             subtitle: Text(_formatPrice(price)),
@@ -1212,20 +1315,28 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               const CircleAvatar(
-                  radius: 40,
-                  backgroundImage:
-                  AssetImage('assets/images/anh_avata_macdinh.png')),
+                radius: 40,
+                backgroundImage: AssetImage(
+                  'assets/images/anh_avata_macdinh.png',
+                ),
+              ),
               const SizedBox(height: 12),
-              Text(widget.fullName,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(
+                widget.fullName,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
               Chip(
                 label: Text(
-                    widget.isAdmin ? 'Quản trị viên' : 'Khách hàng',
-                    style: const TextStyle(color: Colors.white)),
-                backgroundColor:
-                widget.isAdmin ? Colors.redAccent : Colors.blue,
+                  widget.isAdmin ? 'Quản trị viên' : 'Khách hàng',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                backgroundColor: widget.isAdmin
+                    ? Colors.redAccent
+                    : Colors.blue,
               ),
             ],
           ),
@@ -1233,17 +1344,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const SizedBox(height: 8),
       const Card(
-          child:
-          ListTile(leading: Icon(Icons.settings), title: Text('Cài đặt'))),
+        child: ListTile(leading: Icon(Icons.settings), title: Text('Cài đặt')),
+      ),
       const Card(
-          child: ListTile(
-              leading: Icon(Icons.history),
-              title: Text('Lịch sử mua hàng'))),
+        child: ListTile(
+          leading: Icon(Icons.history),
+          title: Text('Lịch sử mua hàng'),
+        ),
+      ),
       Card(
         child: ListTile(
           leading: const Icon(Icons.logout, color: Colors.red),
-          title: const Text('Đăng xuất',
-              style: TextStyle(color: Colors.red)),
+          title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
           onTap: () {},
         ),
       ),
@@ -1266,9 +1378,10 @@ class _HomeScreenState extends State<HomeScreen> {
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart), label: 'Giỏ hàng'),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.favorite), label: 'Yêu thích'),
+          icon: Icon(Icons.shopping_cart),
+          label: 'Giỏ hàng',
+        ),
+        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Yêu thích'),
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
       ],
     );
@@ -1279,17 +1392,21 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       children: [
         const CircleAvatar(
-            backgroundImage:
-            AssetImage('assets/images/anh_avata_macdinh.png'),
-            radius: 22),
+          backgroundImage: AssetImage('assets/images/anh_avata_macdinh.png'),
+          radius: 22,
+        ),
         const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
-            Text('Xin chào 👋',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('Chúc bạn một ngày tốt lành!',
-                style: TextStyle(color: Colors.grey)),
+            Text(
+              'Xin chào 👋',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Text(
+              'Chúc bạn một ngày tốt lành!',
+              style: TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       ],
@@ -1304,10 +1421,10 @@ class _HomeScreenState extends State<HomeScreen> {
         filled: true,
         fillColor: Colors.grey[100],
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
       ),
       onChanged: (v) => setState(() => searchQuery = v),
     );
@@ -1317,44 +1434,49 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onLongPress: widget.isAdmin
           ? () {
-        final ctrl =
-        TextEditingController(text: salePercent.toInt().toString());
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Sửa phần trăm giảm giá'),
-            content: TextField(
-              controller: ctrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Phần trăm giảm giá', suffixText: '%'),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Hủy')),
-              ElevatedButton(
-                onPressed: () {
-                  final v = int.tryParse(ctrl.text);
-                  if (v != null && v >= 0 && v <= 100) {
-                    setState(() => salePercent = v.toDouble());
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('Lưu'),
-              ),
-            ],
-          ),
-        );
-      }
+              final ctrl = TextEditingController(
+                text: salePercent.toInt().toString(),
+              );
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Sửa phần trăm giảm giá'),
+                  content: TextField(
+                    controller: ctrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Phần trăm giảm giá',
+                      suffixText: '%',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Hủy'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        final v = int.tryParse(ctrl.text);
+                        if (v != null && v >= 0 && v <= 100) {
+                          setState(() => salePercent = v.toDouble());
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: const Text('Lưu'),
+                    ),
+                  ],
+                ),
+              );
+            }
           : null,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-              colors: [Colors.redAccent, Colors.orangeAccent],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight),
+            colors: [Colors.redAccent, Colors.orangeAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -1363,20 +1485,26 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Ưu đãi đặc biệt hôm nay',
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
+                const Text(
+                  'Ưu đãi đặc biệt hôm nay',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 const SizedBox(height: 4),
-                Text('Giảm giá đến ${salePercent.toInt()}%',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold)),
+                Text(
+                  'Giảm giá đến ${salePercent.toInt()}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.redAccent),
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.redAccent,
+              ),
               onPressed: () {
                 setState(() {
                   showSaleOnly = true;
@@ -1392,27 +1520,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('Danh mục nổi bật',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        if (widget.isAdmin)
-          Row(
-            children: [
-              IconButton(
-                  onPressed: _addCategory,
-                  icon: const Icon(Icons.add_circle_outline,
-                      color: Colors.redAccent),
-                  tooltip: 'Thêm danh mục mới'),
-              IconButton(
-                  onPressed: _openCategoryManager,
-                  icon:
-                  const Icon(Icons.manage_search, color: Colors.redAccent),
-                  tooltip: 'Quản lý danh mục'),
-            ],
-          ),
-      ],
+    return const Text(
+      'Danh mục nổi bật',
+      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
     );
   }
 
@@ -1421,7 +1531,8 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.7,
@@ -1431,9 +1542,10 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              const Text('Quản lý danh mục',
-                  style:
-                  TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                'Quản lý danh mục',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView.builder(
@@ -1449,18 +1561,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _editCategory(c);
-                                }),
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _editCategory(c);
+                              },
+                            ),
                             IconButton(
-                                icon:
-                                const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _deleteCategory(c['id']);
-                                }),
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _deleteCategory(c['id']);
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -1479,7 +1592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.add),
                   label: const Text('Thêm danh mục'),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -1490,8 +1603,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoryChips() {
     if (categories.isEmpty) {
       return const Center(
-          child: Text('Chưa có danh mục nào',
-              style: TextStyle(color: Colors.grey)));
+        child: Text(
+          'Chưa có danh mục nào',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
     }
     return SizedBox(
       height: 48,
@@ -1504,9 +1620,10 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedColor: Colors.redAccent,
             backgroundColor: Colors.redAccent.withOpacity(0.15),
             labelStyle: TextStyle(
-                color: selectedCategoryId == null && !showSaleOnly
-                    ? Colors.white
-                    : Colors.black),
+              color: selectedCategoryId == null && !showSaleOnly
+                  ? Colors.white
+                  : Colors.black,
+            ),
             onSelected: (_) async {
               setState(() {
                 selectedCategoryId = null;
@@ -1517,20 +1634,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
           ...categories.map((cat) {
-            final selected =
-                selectedCategoryId == cat['id'] && !showSaleOnly;
+            final selected = selectedCategoryId == cat['id'] && !showSaleOnly;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
-                onLongPress:
-                widget.isAdmin ? () => _showCategoryOptions(cat) : null,
+                onLongPress: null,
                 child: ChoiceChip(
                   label: Text(cat['name']),
                   selected: selected,
                   selectedColor: Colors.redAccent,
                   backgroundColor: Colors.redAccent.withOpacity(0.15),
-                  labelStyle:
-                  TextStyle(color: selected ? Colors.white : Colors.black),
+                  labelStyle: TextStyle(
+                    color: selected ? Colors.white : Colors.black,
+                  ),
                   onSelected: (_) async {
                     setState(() {
                       selectedCategoryId = cat['id'];
@@ -1551,9 +1667,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(showSaleOnly ? 'Sản phẩm khuyến mãi' : 'Sản phẩm nổi bật',
-            style:
-            const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Text(
+          showSaleOnly ? 'Sản phẩm khuyến mãi' : 'Sản phẩm nổi bật',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         TextButton(
           onPressed: () async {
             setState(() {
@@ -1578,31 +1695,39 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.search_off, size: 64, color: Colors.grey),
             SizedBox(height: 16),
-            Text('Không có sản phẩm nào phù hợp',
-                style: TextStyle(color: Colors.grey, fontSize: 16)),
+            Text(
+              'Không có sản phẩm nào phù hợp',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
           ],
         ),
       );
     }
     return GridView.builder(
       key: ValueKey(
-          '${selectedCategoryId ?? 'all'}-$showSaleOnly-$searchQuery'),
+        '${selectedCategoryId ?? 'all'}-$showSaleOnly-$searchQuery',
+      ),
       itemCount: list.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.62),
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.62,
+      ),
       itemBuilder: (context, i) {
         final pdt = list[i];
         final sale = (pdt['discount'] as int?) ?? 0;
 
         List imgs;
         try {
-          imgs = jsonDecode(pdt['images'] ??
-              '["assets/images/anh_macdinh_sanpham_chuachonanh.png"]') as List;
+          imgs =
+              jsonDecode(
+                    pdt['images'] ??
+                        '["assets/images/anh_macdinh_sanpham_chuachonanh.png"]',
+                  )
+                  as List;
         } catch (_) {
           imgs = const [];
         }
@@ -1610,7 +1735,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ? imgs.first as String
             : 'assets/images/anh_macdinh_sanpham_chuachonanh.png';
 
-        final currentPrice = (pdt['price'] as num?)?.toDouble() ?? 0.0; // giá sau giảm
+        final currentPrice =
+            (pdt['price'] as num?)?.toDouble() ?? 0.0; // giá sau giảm
         final oldPrice = (pdt['oldPrice'] as num?)?.toDouble() ?? 0.0;
 
         final status = (pdt['status'] as int?) ?? 1;
@@ -1636,71 +1762,82 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         return GestureDetector(
-          onLongPress: widget.isAdmin ? () => _showProductOptions(pdt) : null,
-          onTap: () {
-            if (widget.isAdmin) {
-              _showAddProductDialog(product: pdt);
-            } else {
-              _viewProductDetail(pdt);
-            }
-          },
+          onTap: () => _viewProductDetail(pdt),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 6,
-                    spreadRadius: 1,
-                    offset: Offset(0, 2))
+                  color: Colors.black12,
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
                   child: AspectRatio(
                     aspectRatio: 16 / 12,
                     child: imagePath.startsWith('/')
-                        ? Image.file(File(imagePath),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _imageFallback())
-                        : Image.asset(imagePath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _imageFallback()),
+                        ? Image.file(
+                            File(imagePath),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _imageFallback(),
+                          )
+                        : Image.asset(
+                            imagePath,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _imageFallback(),
+                          ),
                   ),
                 ),
                 Padding(
-                  padding:
-                  const EdgeInsets.only(top: 6, left: 8, right: 8),
+                  padding: const EdgeInsets.only(top: 6, left: 8, right: 8),
                   child: Row(
                     children: [
                       if (sale > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(6)),
-                          child: Text('-$sale%',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold)),
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '-$sale%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(6)),
-                        child: Text(statusText,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 10)),
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1708,53 +1845,79 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 6),
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(pdt['name'] ?? '',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text(
+                          pdt['name'] ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         if (rating > 0) ...[
-                          Row(children: [
-                            _buildStarRating(rating),
-                            const SizedBox(width: 4),
-                            Text('($reviewCount)',
+                          Row(
+                            children: [
+                              _buildStarRating(rating),
+                              const SizedBox(width: 4),
+                              Text(
+                                '($reviewCount)',
                                 style: const TextStyle(
-                                    fontSize: 10, color: Colors.grey))
-                          ]),
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                         ],
-                        Text(_formatPrice(currentPrice),
-                            style: const TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
+                        Text(
+                          _formatPrice(currentPrice),
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                         if (sale > 0 && oldPrice > 0)
-                          Text(_formatPrice(oldPrice),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                  decoration: TextDecoration.lineThrough)),
+                          Text(
+                            _formatPrice(oldPrice),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
                         const Spacer(),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
                           child: Row(
                             children: [
-                              Text('SL: $quantity',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
+                              Text(
+                                'SL: $quantity',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
                               const SizedBox(width: 6),
                               if (soldCount > 0)
-                                Text('Đã bán: $soldCount',
-                                    style: const TextStyle(
-                                        fontSize: 10, color: Colors.grey)),
+                                Text(
+                                  'Đã bán: $soldCount',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -1775,16 +1938,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
-        return Icon(Icons.star,
-            size: 12,
-            color:
-            index < rating.floor() ? Colors.amber : Colors.grey[300]);
+        return Icon(
+          Icons.star,
+          size: 12,
+          color: index < rating.floor() ? Colors.amber : Colors.grey[300],
+        );
       }),
     );
   }
 
   Widget _imageFallback() => Container(
-      color: Colors.grey[200],
-      child: const Center(
-          child: Icon(Icons.photo, size: 40, color: Colors.grey)));
+    color: Colors.grey[200],
+    child: const Center(child: Icon(Icons.photo, size: 40, color: Colors.grey)),
+  );
 }
