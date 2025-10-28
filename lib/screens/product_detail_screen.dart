@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../database/db_helper.dart';
+import 'shipping_address_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -19,6 +22,7 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  // --- state sản phẩm ---
   int _selectedImageIndex = 0;
   int _quantity = 1;
   String? _selectedSize;
@@ -33,7 +37,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _reviewCount = 0;
   List<Map<String, dynamic>> _reviews = [];
 
-  double _asDouble(dynamic v) {
+  // --- state user & địa chỉ mặc định ---
+  Map<String, dynamic>? _user;
+  Map<String, dynamic>? _defaultAddress;
+
+  // ---------- Helpers ép kiểu an toàn ----------
+  double asDouble(dynamic v) {
     if (v == null) return 0.0;
     if (v is double) return v;
     if (v is int) return v.toDouble();
@@ -41,7 +50,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return 0.0;
   }
 
-  int _asInt(dynamic v) {
+  int asInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
     if (v is double) return v.toInt();
@@ -49,7 +58,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return 0;
   }
 
-  List<String> _parseStringList(dynamic raw) {
+  List<String> parseStringList(dynamic raw) {
     try {
       if (raw == null) return <String>[];
       final decoded = raw is String ? jsonDecode(raw) : raw;
@@ -65,24 +74,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadProductData();
     _loadReviews();
     _checkIfFavorite();
-    DBHelper.incrementProductView(_asInt(widget.product['id']));
+    _loadUserAndDefaultAddress();
+    DBHelper.incrementProductView(asInt(widget.product['id']));
+  }
+
+  Future<void> _loadUserAndDefaultAddress() async {
+    final u = await DBHelper.getUserById(widget.userId);
+    final addrs = await DBHelper.getAddressesByUser(widget.userId);
+    Map<String, dynamic>? def;
+    if (addrs.isNotEmpty) {
+      def = addrs.firstWhere(
+            (e) => (e['isDefault'] as int? ?? 0) == 1,
+        orElse: () => addrs.first,
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _user = u;
+      _defaultAddress = def;
+    });
   }
 
   void _loadProductData() {
-    _images = _parseStringList(widget.product['images']);
-    _sizes = _parseStringList(widget.product['sizes']);
-    _colors = _parseStringList(widget.product['colors']);
+    _images = parseStringList(widget.product['images']);
+    _sizes = parseStringList(widget.product['sizes']);
+    _colors = parseStringList(widget.product['colors']);
 
-    _rating = _asDouble(widget.product['rating']);
-    _reviewCount = _asInt(widget.product['reviewCount']);
+    _rating = asDouble(widget.product['rating']);
+    _reviewCount = asInt(widget.product['reviewCount']);
 
     if (_sizes.isNotEmpty) _selectedSize = _sizes.first;
     if (_colors.isNotEmpty) _selectedColor = _colors.first;
   }
 
   Future<void> _loadReviews() async {
-    final reviews =
-    await DBHelper.getProductReviews(_asInt(widget.product['id']));
+    final id = asInt(widget.product['id']);
+    final reviews = await DBHelper.getProductReviews(id);
     if (!mounted) return;
     setState(() => _reviews = reviews);
   }
@@ -90,75 +117,98 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _checkIfFavorite() async {
     final ok = await DBHelper.isProductInFavorites(
       widget.userId,
-      _asInt(widget.product['id']),
+      widget.product['id'] as int,
     );
     if (!mounted) return;
     setState(() => _isFavorite = ok);
   }
 
   Future<void> _toggleFavorite() async {
-    final pid = _asInt(widget.product['id']);
-    await DBHelper.toggleFavorite(widget.userId, pid);
-    final nowFav = await DBHelper.isProductInFavorites(widget.userId, pid);
+    await DBHelper.toggleFavorite(widget.userId, widget.product['id'] as int);
+    final nowFav = await DBHelper.isProductInFavorites(
+      widget.userId,
+      widget.product['id'] as int,
+    );
     if (!mounted) return;
     setState(() => _isFavorite = nowFav);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(nowFav
-            ? 'Đã thêm vào yêu thích'
-            : 'Đã xóa khỏi yêu thích'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _snack(nowFav ? 'Đã thêm vào yêu thích' : 'Đã xóa khỏi yêu thích');
   }
 
-  void _addToCart() {
+  Future<void> _addToCart() async {
     if (_sizes.isNotEmpty && _selectedSize == null) {
-      _showMessage('Vui lòng chọn size');
+      _snack('Vui lòng chọn size', ok: false);
       return;
     }
     if (_colors.isNotEmpty && _selectedColor == null) {
-      _showMessage('Vui lòng chọn màu');
+      _snack('Vui lòng chọn màu', ok: false);
       return;
     }
-    _showMessage('Đã thêm vào giỏ hàng');
+    final stock = asInt(widget.product['quantity']);
+    if (stock <= 0 || asInt(widget.product['status']) == 0) {
+      _snack('Sản phẩm đã hết hàng', ok: false);
+      return;
+    }
+    if (_quantity > stock) {
+      _snack('Số lượng vượt quá tồn kho ($stock)', ok: false);
+      return;
+    }
+
+    await DBHelper.addToCart(
+      userId: widget.userId,
+      productId: widget.product['id'] as int,
+      quantity: _quantity,
+      size: _selectedSize,
+      color: _selectedColor,
+    );
+    _snack('Đã thêm vào giỏ hàng');
   }
 
-  void _buyNow() {
-    _addToCart();
+  Future<void> _buyNow() async {
+    if (_sizes.isNotEmpty && _selectedSize == null) {
+      _snack('Vui lòng chọn size', ok: false);
+      return;
+    }
+    if (_colors.isNotEmpty && _selectedColor == null) {
+      _snack('Vui lòng chọn màu', ok: false);
+      return;
+    }
+    final stock = asInt(widget.product['quantity']);
+    if (stock <= 0 || asInt(widget.product['status']) == 0) {
+      _snack('Sản phẩm đã hết hàng', ok: false);
+      return;
+    }
+    if (_quantity > stock) {
+      _snack('Số lượng vượt quá tồn kho ($stock)', ok: false);
+      return;
+    }
+
+    await _openCheckoutSheet();
   }
 
-  void _showMessage(String message) {
+  void _snack(String m, {bool ok = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+      SnackBar(content: Text(m), backgroundColor: ok ? Colors.green : Colors.redAccent),
     );
   }
 
-  String _formatPrice(double price) {
-    final fmt =
-    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
-    return fmt.format(price);
-  }
+  String _formatPrice(num price) =>
+      NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+          .format(price);
 
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
 
-    // ---- SỬA LOGIC TÍNH GIÁ ----
-    final double price = _asDouble(p['price']);       // thường là giá đã giảm
-    final double oldPrice = _asDouble(p['oldPrice']); // giá gốc
-    final int discount = _asInt(p['discount']);
+    final double currentPrice = asDouble(p['price']);
+    final double oldPrice = asDouble(p['oldPrice']);
+    final int discount = asInt(p['discount']);
 
-    // base để tính giảm: nếu có oldPrice>0 thì base=oldPrice, ngược lại base=price
-    final double base = oldPrice > 0 ? oldPrice : price;
-    final double newPrice =
-    discount > 0 ? base * (1 - discount / 100.0) : price;
-
-    final int status = _asInt(p['status']);
-    final int quantity = _asInt(p['quantity']);
-    final int soldCount = _asInt(p['soldCount']);
-    final int viewCount = _asInt(p['viewCount']);
+    final int status = asInt(p['status']);
+    final int quantity = asInt(p['quantity']);
+    final int soldCount = asInt(p['soldCount']);
+    final int viewCount = asInt(p['viewCount']);
     final String material = (p['material'] ?? 'Chưa cập nhật').toString();
     final String name = (p['name'] ?? '').toString();
     final String description = (p['description'] ?? '').toString();
@@ -175,7 +225,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     _buildImageGallery(),
                     _buildProductInfo(
                       name,
-                      newPrice,
+                      currentPrice,
                       oldPrice,
                       discount,
                       status,
@@ -187,11 +237,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       _buildVariantSelectors(),
                     _buildProductDetails(material, description),
                     _buildReviewsSection(),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
             ),
-            _buildBottomBar(),
+            _buildBottomBar(currentPrice),
           ],
         ),
       ),
@@ -217,7 +268,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () {},
+            onPressed: () => _snack('Tính năng chia sẻ sẽ bổ sung sau'),
           ),
         ],
       ),
@@ -235,16 +286,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           height: 300,
           child: PageView.builder(
             itemCount: imgs.length,
-            onPageChanged: (i) => setState(() => _selectedImageIndex = i),
+            onPageChanged: (index) => setState(() => _selectedImageIndex = index),
             itemBuilder: (context, index) {
-              final path = imgs[index];
-              final Widget img = path.startsWith('/')
-                  ? Image.file(File(path),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _imageFallback())
-                  : Image.asset(path,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _imageFallback());
+              final imagePath = imgs[index];
+              final isFile = imagePath.startsWith('/');
+
+              final img = isFile
+                  ? Image.file(
+                File(imagePath),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _imageFallback(),
+              )
+                  : Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _imageFallback(),
+              );
+
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ClipRRect(
@@ -265,8 +323,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               height: 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color:
-                _selectedImageIndex == index ? Colors.blue : Colors.grey,
+                color: _selectedImageIndex == index ? Colors.blue : Colors.grey,
               ),
             );
           }),
@@ -284,7 +341,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildProductInfo(
       String name,
-      double newPrice,
+      double currentPrice,
       double oldPrice,
       int discount,
       int status,
@@ -303,32 +360,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               _buildStarRating(_rating),
               const SizedBox(width: 8),
-              Text('$_rating (${_reviewCount} đánh giá)',
-                  style: const TextStyle(color: Colors.grey)),
+              Text('$_rating ($_reviewCount đánh giá)', style: const TextStyle(color: Colors.grey)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Text(_formatPrice(newPrice),
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
-              if (discount > 0 && oldPrice > 0) ...[
+              Text(
+                _formatPrice(currentPrice),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red),
+              ),
+              if (discount > 0 && oldPrice > currentPrice) ...[
                 const SizedBox(width: 8),
-                Text(_formatPrice(oldPrice),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
-                      decoration: TextDecoration.lineThrough,
-                    )),
+                Text(
+                  _formatPrice(oldPrice),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                  child: Text('-$discount%',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
+                  child: Text(
+                    '-$discount%',
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ],
@@ -345,8 +404,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           if (quantity <= 5 && status == 1) ...[
             const SizedBox(height: 8),
-            Text('Chỉ còn $quantity sản phẩm',
-                style: const TextStyle(color: Colors.orange)),
+            Text('Chỉ còn $quantity sản phẩm', style: const TextStyle(color: Colors.orange)),
           ],
         ],
       ),
@@ -371,10 +429,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration:
-      BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
-      child:
-      Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
     );
   }
 
@@ -385,32 +441,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_sizes.isNotEmpty) ...[
-            const Text('Chọn size:',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Chọn size:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: _sizes
-                  .map((s) => ChoiceChip(
-                label: Text(s),
-                selected: _selectedSize == s,
-                onSelected: (_) => setState(() => _selectedSize = s),
+                  .map((size) => ChoiceChip(
+                label: Text(size),
+                selected: _selectedSize == size,
+                onSelected: (_) => setState(() => _selectedSize = size),
               ))
                   .toList(),
             ),
             const SizedBox(height: 16),
           ],
           if (_colors.isNotEmpty) ...[
-            const Text('Chọn màu:',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Chọn màu:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: _colors
-                  .map((c) => ChoiceChip(
-                label: Text(c),
-                selected: _selectedColor == c,
-                onSelected: (_) => setState(() => _selectedColor = c),
+                  .map((color) => ChoiceChip(
+                label: Text(color),
+                selected: _selectedColor == color,
+                onSelected: (_) => setState(() => _selectedColor = color),
               ))
                   .toList(),
             ),
@@ -427,16 +481,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Thông tin sản phẩm',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('Thông tin sản phẩm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           _detailRow('Chất liệu', material),
           const SizedBox(height: 12),
-          const Text('Mô tả sản phẩm',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('Mô tả sản phẩm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(description,
-              style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          Text(description, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         ],
       ),
     );
@@ -447,8 +498,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text('$title: ',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(child: Text(value)),
         ],
       ),
@@ -461,19 +511,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Đánh giá sản phẩm',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('Đánh giá sản phẩm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           if (_reviews.isEmpty)
-            const Center(
-              child:
-              Text('Chưa có đánh giá nào', style: TextStyle(color: Colors.grey)),
-            )
+            const Center(child: Text('Chưa có đánh giá nào', style: TextStyle(color: Colors.grey)))
           else
-            Column(
-              children:
-              _reviews.map((r) => _buildReviewItem(r)).toList(),
-            ),
+            Column(children: _reviews.map((r) => _buildReviewItem(r)).toList()),
         ],
       ),
     );
@@ -481,7 +524,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildReviewItem(Map<String, dynamic> review) {
     final userName = (review['userName'] ?? 'Khách hàng').toString();
-    final rating = _asInt(review['rating']).toDouble();
+    final rating = asInt(review['rating']).toDouble();
     final comment = (review['comment'] ?? '').toString();
     final createdAt = (review['createdAt'] ?? '').toString();
 
@@ -496,8 +539,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 const CircleAvatar(
                   radius: 16,
-                  backgroundImage:
-                  AssetImage('assets/images/anh_avata_macdinh.png'),
+                  backgroundImage: AssetImage('assets/images/anh_avata_macdinh.png'),
                 ),
                 const SizedBox(width: 8),
                 Text(userName, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -506,117 +548,313 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            if (comment.isNotEmpty) Text(comment),
+            if (comment.isNotEmpty) Text(comment, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 8),
-            Text(_formatDate(createdAt),
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(_formatDate(createdAt), style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
       ),
     );
   }
 
-  String _formatDate(String s) {
+  String _formatDate(String dateString) {
     try {
-      final d = DateTime.parse(s);
-      return DateFormat('dd/MM/yyyy').format(d);
+      final date = DateTime.parse(dateString);
+      return DateFormat('dd/MM/yyyy').format(date);
     } catch (_) {
-      return s;
+      return dateString;
     }
   }
 
-  Widget _buildStarRating(double rating) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(
-        5,
-            (i) => Icon(Icons.star,
-            size: 16, color: i < rating.floor() ? Colors.amber : Colors.grey[300]),
+  Widget _buildStarRating(double rating) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: List.generate(
+      5,
+          (i) => Icon(Icons.star, size: 16, color: i < rating.floor() ? Colors.amber : Colors.grey[300]),
+    ),
+  );
+
+  // ---- Bottom bar: căn nút đều, không lệch ----
+  Widget _buildBottomBar(double currentPrice) {
+    final status = asInt(widget.product['status']);
+    final isOutOfStock = status == 0;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(.05), blurRadius: 8, offset: const Offset(0, -2))],
+        ),
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            children: [
+              // stepper
+              Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: 20,
+                      icon: const Icon(Icons.remove),
+                      onPressed: () {
+                        if (_quantity > 1) setState(() => _quantity--);
+                      },
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Center(
+                        child: Text('$_quantity', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: 20,
+                      icon: const Icon(Icons.add),
+                      onPressed: () => setState(() => _quantity++),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // buttons
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: isOutOfStock ? null : _addToCart,
+                        child: const Text('Thêm vào giỏ hàng'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: isOutOfStock ? null : _buyNow,
+                        child: Text('Mua ngay'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildBottomBar() {
-    final isOutOfStock = _asInt(widget.product['status']) == 0;
+  // --------- CHECKOUT SHEET (MUA NGAY) ----------
+  Future<void> _openCheckoutSheet() async {
+    // Prefill từ user + default address
+    final nameCtrl = TextEditingController(text: (_user?['fullName'] ?? '').toString());
+    final phoneCtrl = TextEditingController(text: (_user?['phone'] ?? '').toString());
+    final addrText = _composeAddress(_defaultAddress);
+    final addrCtrl = TextEditingController(text: addrText);
+    final noteCtrl = TextEditingController();
+
+    String payment = 'cod'; // 'cod' | 'bank'
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: StatefulBuilder(
+          builder: (context, setLocal) {
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Thông tin đặt hàng',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+
+                  // Khối địa chỉ nhanh
+                  _addressQuickCard(
+                    address: _defaultAddress,
+                    onChange: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ShippingAddressScreen(userId: widget.userId),
+                        ),
+                      );
+                      // reload địa chỉ mặc định sau khi quay lại
+                      await _loadUserAndDefaultAddress();
+                      setLocal(() {
+                        addrCtrl.text = _composeAddress(_defaultAddress);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Họ và tên *'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Số điện thoại *'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: addrCtrl,
+                    decoration: const InputDecoration(labelText: 'Địa chỉ nhận hàng *'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(labelText: 'Ghi chú'),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Phương thức thanh toán',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      Radio<String>(
+                        value: 'cod',
+                        groupValue: payment,
+                        onChanged: (v) => setLocal(() => payment = v!),
+                      ),
+                      const Text('Tiền mặt (COD)'),
+                      const SizedBox(width: 16),
+                      Radio<String>(
+                        value: 'bank',
+                        groupValue: payment,
+                        onChanged: (v) => setLocal(() => payment = v!),
+                      ),
+                      const Text('Chuyển khoản'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty ||
+                            phoneCtrl.text.trim().isEmpty ||
+                            addrCtrl.text.trim().isEmpty) {
+                          _snack('Vui lòng nhập đủ thông tin bắt buộc', ok: false);
+                          return;
+                        }
+
+                        final currentPrice = asDouble(widget.product['price']);
+
+                        final orderRes = await DBHelper.createOrder(
+                          userId: widget.userId,
+                          customerName: nameCtrl.text.trim(),
+                          customerPhone: phoneCtrl.text.trim(),
+                          shippingAddress: addrCtrl.text.trim(),
+                          paymentMethod: payment,
+                          note: noteCtrl.text.trim(),
+                          items: [
+                            {
+                              'productId': widget.product['id'] as int,
+                              'name': (widget.product['name'] ?? '').toString(),
+                              'price': currentPrice,
+                              'quantity': _quantity,
+                              'size': _selectedSize,
+                              'color': _selectedColor,
+                              'discount': asInt(widget.product['discount']),
+                            }
+                          ],
+                        );
+
+                        if (!mounted) return;
+                        if (orderRes['ok'] == true) {
+                          Navigator.pop(context);
+                          _snack('Đặt hàng thành công: ${orderRes['orderCode']}');
+                        } else {
+                          _snack('Tạo đơn thất bại: ${orderRes['error'] ?? 'Lỗi không xác định'}',
+                              ok: false);
+                        }
+                      },
+                      label: const Text('Xác nhận đặt hàng'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // Hiển thị thẻ địa chỉ nhanh + nút thay đổi
+  Widget _addressQuickCard({
+    required Map<String, dynamic>? address,
+    required VoidCallback onChange,
+  }) {
+    final has = address != null;
+    final title = has
+        ? '${address['label'] ?? ''}${(address['isDefault'] == 1) ? ' (Mặc định)' : ''}'
+        : 'Chưa có địa chỉ';
+    final subtitle = has ? _composeAddress(address) : 'Thêm địa chỉ giao hàng để mua nhanh hơn';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: Colors.orange.withOpacity(.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withOpacity(.2)),
       ),
       child: Row(
         children: [
+          const Icon(Icons.location_on_outlined, color: Colors.orange),
+          const SizedBox(width: 8),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.remove),
-                  onPressed: () {
-                    if (_quantity > 1) setState(() => _quantity--);
-                  },
-                ),
-                Text('$_quantity',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () => setState(() => _quantity++),
-                ),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(color: Colors.black54)),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                if (!isOutOfStock) ...[
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _addToCart,
-                      child: const Text('Thêm giỏ'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _buyNow,
-                      child: const Text('Mua ngay'),
-                    ),
-                  ),
-                ] else
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: null,
-                      child: const Text('Hết hàng'),
-                    ),
-                  ),
-              ],
-            ),
+          TextButton(
+            onPressed: onChange,
+            child: Text(has ? 'Thay đổi' : 'Thêm địa chỉ'),
           ),
         ],
       ),
     );
+  }
+
+  String _composeAddress(Map<String, dynamic>? addr) {
+    if (addr == null) return '';
+    final parts = <String>[
+      (addr['fullAddress'] ?? '').toString(),
+      (addr['city'] ?? '').toString(),
+      (addr['state'] ?? '').toString(),
+      (addr['zipCode'] ?? '').toString(),
+    ].where((e) => e.trim().isNotEmpty).toList();
+    return parts.join(', ');
   }
 }

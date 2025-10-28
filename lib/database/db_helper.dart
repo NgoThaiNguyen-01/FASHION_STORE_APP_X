@@ -14,7 +14,7 @@ class DBHelper {
   // =============================
   static Future<Database> get database async {
     if (_db != null) return _db!;
-    _db = await _initDB('fashion_store_db_v5.sqlite');
+    _db = await _initDB('fashion_store_db_v5.sqlite'); // giữ tên file cũ
     return _db!;
   }
 
@@ -24,9 +24,8 @@ class DBHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6, // 🔺 bump version để migrate tạo bảng địa chỉ
       onConfigure: (db) async {
-        // Bật foreign keys để ON DELETE CASCADE hoạt động
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _createTables,
@@ -181,6 +180,23 @@ class DBHelper {
       )
     ''');
 
+    // ✅ Bảng địa chỉ giao hàng
+    await db.execute('''
+      CREATE TABLE shipping_addresses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER,
+        label TEXT NOT NULL,
+        fullAddress TEXT NOT NULL,
+        city TEXT,
+        state TEXT,
+        zipCode TEXT,
+        isDefault INTEGER DEFAULT 0,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    ''');
+
     await _createSampleData(db);
   }
 
@@ -316,6 +332,25 @@ class DBHelper {
         await db.execute('ALTER TABLE users ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP');
       } catch (_) {}
     }
+
+    // 🔺 Thêm ở đây: migrate tạo bảng địa chỉ khi nâng cấp từ các bản cũ
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shipping_addresses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER,
+          label TEXT NOT NULL,
+          fullAddress TEXT NOT NULL,
+          city TEXT,
+          state TEXT,
+          zipCode TEXT,
+          isDefault INTEGER DEFAULT 0,
+          createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 
   // =============================
@@ -371,7 +406,10 @@ class DBHelper {
         'oldPrice': 350000,
         'description':
         'Áo thun nam chất liệu cotton cao cấp, thoáng mát, thấm hút mồ hôi tốt. Phù hợp cho mọi hoạt động hàng ngày.',
-        'images': jsonEncode(['assets/images/product_1_1.jpg', 'assets/images/product_1_2.jpg']),
+        'images': jsonEncode([
+          'assets/images/product_1_1.jpg',
+          'assets/images/product_1_2.jpg'
+        ]),
         'discount': 30,
         'quantity': 50,
         'status': 1,
@@ -391,7 +429,10 @@ class DBHelper {
         'oldPrice': 550000,
         'description':
         'Quần jean nam dáng slim fit, chất liệu denim co giãn, thoải mái vận động. Màu xanh đậm thời trang.',
-        'images': jsonEncode(['assets/images/product_2_1.jpg', 'assets/images/product_2_2.jpg']),
+        'images': jsonEncode([
+          'assets/images/product_2_1.jpg',
+          'assets/images/product_2_2.jpg'
+        ]),
         'discount': 20,
         'quantity': 30,
         'status': 1,
@@ -411,7 +452,10 @@ class DBHelper {
         'oldPrice': 480000,
         'description':
         'Váy đầm nữ dáng body suit ôm tôn dáng, chất liệu vải mềm mại, phù hợp đi làm và dạo phố.',
-        'images': jsonEncode(['assets/images/product_3_1.jpg', 'assets/images/product_3_2.jpg']),
+        'images': jsonEncode([
+          'assets/images/product_3_1.jpg',
+          'assets/images/product_3_2.jpg'
+        ]),
         'discount': 25,
         'quantity': 25,
         'status': 1,
@@ -431,7 +475,10 @@ class DBHelper {
         'oldPrice': 0,
         'description':
         'Áo sơ mi nam trắng form regular, chất liệu cotton pha, cổ bẻ, tay dài. Phù hợp mặc công sở.',
-        'images': jsonEncode(['assets/images/product_4_1.jpg', 'assets/images/product_4_2.jpg']),
+        'images': jsonEncode([
+          'assets/images/product_4_1.jpg',
+          'assets/images/product_4_2.jpg'
+        ]),
         'discount': 0,
         'quantity': 0,
         'status': 0,
@@ -451,7 +498,10 @@ class DBHelper {
         'oldPrice': 220000,
         'description':
         'Áo thun nữ dáng croptop trẻ trung, chất liệu cotton mềm mại, nhiều màu sắc thời trang.',
-        'images': jsonEncode(['assets/images/product_5_1.jpg', 'assets/images/product_5_2.jpg']),
+        'images': jsonEncode([
+          'assets/images/product_5_1.jpg',
+          'assets/images/product_5_2.jpg'
+        ]),
         'discount': 15,
         'quantity': 15,
         'status': 2,
@@ -511,8 +561,7 @@ class DBHelper {
       'userId': 2,
       'productId': 1,
       'rating': 5,
-      'comment':
-      'Áo rất đẹp, chất liệu tốt, mặc thoải mái. Sẽ ủng hộ shop dài dài!',
+      'comment': 'Áo rất đẹp, chất liệu tốt, mặc thoải mái. Sẽ ủng hộ shop dài dài!',
       'images': jsonEncode([]),
     });
 
@@ -520,8 +569,7 @@ class DBHelper {
       'userId': 2,
       'productId': 2,
       'rating': 4,
-      'comment':
-      'Quần vừa vặn, chất liệu tốt. Nhưng màu hơi khác so với hình ảnh.',
+      'comment': 'Quần vừa vặn, chất liệu tốt. Nhưng màu hơi khác so với hình ảnh.',
       'images': jsonEncode([]),
     });
 
@@ -529,8 +577,7 @@ class DBHelper {
       'userId': 2,
       'productId': 3,
       'rating': 5,
-      'comment':
-      'Váy rất đẹp, form dáng chuẩn. Chất vải mát, mặc đi làm rất phù hợp.',
+      'comment': 'Váy rất đẹp, form dáng chuẩn. Chất vải mát, mặc đi làm rất phù hợp.',
       'images': jsonEncode([]),
     });
   }
@@ -562,8 +609,7 @@ class DBHelper {
     );
   }
 
-  static Future<void> updateCategory(int id, String name, String? desc,
-      {String? image}) async {
+  static Future<void> updateCategory(int id, String name, String? desc, {String? image}) async {
     final db = await database;
     await db.update(
       'categories',
@@ -728,9 +774,18 @@ class DBHelper {
     final db = await database;
     await db.rawUpdate('''
       UPDATE products 
-      SET soldCount = soldCount + ?, quantity = quantity - ?, updatedAt = ?
+      SET soldCount = soldCount + ?, 
+          quantity  = CASE WHEN quantity - ? < 0 THEN 0 ELSE quantity - ? END,
+          status    = CASE WHEN (CASE WHEN quantity - ? < 0 THEN 0 ELSE quantity - ? END) > 0 THEN 1 ELSE 0 END,
+          updatedAt = ?
       WHERE id = ?
-    ''', [soldQuantity, soldQuantity, DateTime.now().toIso8601String(), id]);
+    ''', [
+      soldQuantity,
+      soldQuantity, soldQuantity,
+      soldQuantity, soldQuantity,
+      DateTime.now().toIso8601String(),
+      id
+    ]);
   }
 
   // =============================
@@ -846,6 +901,13 @@ class DBHelper {
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     final db = await database;
     return db.query('users', orderBy: 'createdAt DESC');
+  }
+
+  static Future<Map<String, dynamic>?> getUserById(int userId) async {
+    final db = await database;
+    final res = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+    if (res.isNotEmpty) return res.first;
+    return null;
   }
 
   static Future<void> updateUserRole(int userId, String role) async {
@@ -1058,7 +1120,6 @@ class DBHelper {
   }) async {
     final db = await database;
 
-    // Chuẩn hoá để tránh so sánh NULL (= NULL luôn sai trong SQLite)
     final sz = size ?? '';
     final cl = color ?? '';
 
@@ -1128,12 +1189,13 @@ class DBHelper {
       await txn.delete('products');
       await txn.delete('categories');
       await txn.delete('users');
+      await txn.delete('shipping_addresses');
     });
     await _createSampleData(db);
   }
 
   static Future<String> backupDatabase() async {
-    await database; // đảm bảo đã mở
+    await database;
     final dir = await getApplicationDocumentsDirectory();
     final originalPath = join(dir.path, 'fashion_store_db_v5.sqlite');
     final backupPath = join(dir.path, 'backup_${DateTime.now().millisecondsSinceEpoch}.sqlite');
@@ -1150,7 +1212,6 @@ class DBHelper {
       await db.rawQuery('SELECT 1');
       return true;
     } catch (e) {
-      // ignore: avoid_print
       print('Database connection error: $e');
       return false;
     }
@@ -1169,4 +1230,300 @@ class DBHelper {
     );
     return result.isNotEmpty;
   }
+
+  // =============================
+// 17️⃣ TẠO ĐƠN HÀNG — KHÔNG TRỪ SỐ LƯỢNG
+// =============================
+  static Future<Map<String, dynamic>> createOrder({
+    required int userId,
+    required String customerName,
+    required String customerPhone,
+    required String shippingAddress,
+    required String paymentMethod,
+    String? note,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    if (items.isEmpty) {
+      return {'ok': false, 'error': 'Không có sản phẩm nào'};
+    }
+    final db = await database;
+    try {
+      return await db.transaction<Map<String, dynamic>>((txn) async {
+        num total = 0;
+        for (final it in items) {
+          final price = (it['price'] as num?)?.toDouble() ?? 0;
+          final qty = (it['quantity'] as num?)?.toInt() ?? 0;
+          total += price * qty; // ✅ GIÁ SAU GIẢM, KHÔNG TRỪ NỮA
+        }
+
+        final orderCode = 'DH${DateTime.now().millisecondsSinceEpoch}';
+        final orderId = await txn.insert('orders', {
+          'userId': userId,
+          'orderCode': orderCode,
+          'totalAmount': total.toDouble(), // ✅ Tổng tiền cuối cùng
+          'discountAmount': 0,             // ❌ Không trừ thêm giảm giá nữa
+          'finalAmount': total.toDouble(),
+          'status': 'pending',
+          'paymentMethod': paymentMethod,
+          'shippingAddress': shippingAddress,
+          'customerName': customerName,
+          'customerPhone': customerPhone,
+          'note': note,
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+
+        for (final it in items) {
+          final productId = (it['productId'] as num).toInt();
+          final price = (it['price'] as num?)?.toDouble() ?? 0;
+          final qty = (it['quantity'] as num?)?.toInt() ?? 0;
+          await txn.insert('order_items', {
+            'orderId': orderId,
+            'productId': productId,
+            'productName': it['name']?.toString() ?? '',
+            'productPrice': price,
+            'quantity': qty,
+            'size': it['size'],
+            'color': it['color'],
+            'discount': 0, // ✅ vì giá đã bao gồm giảm
+            'totalPrice': (price * qty).toDouble(),
+          });
+        }
+
+        return {'ok': true, 'orderId': orderId, 'orderCode': orderCode};
+      });
+    } catch (e) {
+      print('createOrder error: $e');
+      return {'ok': false, 'error': e.toString()};
+    }
+  }
+
+
+// =============================
+// 🆕 HOÀN TẤT ĐƠN & TRỪ KHO
+// =============================
+  static Future<void> completeOrder(int orderId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Cập nhật trạng thái đơn
+      await txn.update('orders', {
+        'status': 'completed',
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, where: 'id = ?', whereArgs: [orderId]);
+
+      // Lấy các sản phẩm trong đơn
+      final items = await txn.query('order_items', where: 'orderId = ?', whereArgs: [orderId]);
+
+      // Trừ số lượng từng sản phẩm
+      for (final it in items) {
+        final productId = (it['productId'] as num).toInt();
+        final quantity = (it['quantity'] as num).toInt();
+
+        await txn.rawUpdate('''
+        UPDATE products
+        SET soldCount = soldCount + ?, 
+            quantity = CASE WHEN quantity - ? < 0 THEN 0 ELSE quantity - ? END,
+            status = CASE WHEN (CASE WHEN quantity - ? < 0 THEN 0 ELSE quantity - ? END) > 0 THEN 1 ELSE 0 END,
+            updatedAt = ?
+        WHERE id = ?
+      ''', [
+          quantity,
+          quantity, quantity,
+          quantity, quantity,
+          DateTime.now().toIso8601String(),
+          productId
+        ]);
+      }
+    });
+  }
+
+  // =============================
+  // 18️⃣ QUẢN LÝ ĐỊA CHỈ GIAO HÀNG
+  // =============================
+  static Future<List<Map<String, dynamic>>> getAddressesByUser(int userId) async {
+    final db = await database;
+    return db.query('shipping_addresses',
+        where: 'userId = ?',
+        whereArgs: [userId],
+        orderBy: 'isDefault DESC, id DESC');
+  }
+
+  static Future<Map<String, dynamic>?> getDefaultAddress(int userId) async {
+    final db = await database;
+    final res = await db.query('shipping_addresses',
+        where: 'userId = ? AND isDefault = 1',
+        whereArgs: [userId],
+        limit: 1);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  static Future<int> addAddress({
+    required int userId,
+    required String label,
+    required String fullAddress,
+    String? city,
+    String? state,
+    String? zipCode,
+    bool isDefault = false,
+  }) async {
+    final db = await database;
+
+    if (isDefault) {
+      await db.update('shipping_addresses', {'isDefault': 0},
+          where: 'userId = ?', whereArgs: [userId]);
+    } else {
+      // nếu user chưa có địa chỉ mặc định, set mặc định cho địa chỉ đầu tiên
+      final cnt = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM shipping_addresses WHERE userId = ? AND isDefault = 1',
+          [userId]))!;
+      if (cnt == 0) isDefault = true;
+    }
+
+    return await db.insert('shipping_addresses', {
+      'userId': userId,
+      'label': label,
+      'fullAddress': fullAddress,
+      'city': city ?? '',
+      'state': state ?? '',
+      'zipCode': zipCode ?? '',
+      'isDefault': isDefault ? 1 : 0,
+      'createdAt': DateTime.now().toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<int> updateAddress({
+    required int id,
+    required String label,
+    required String fullAddress,
+    String? city,
+    String? state,
+    String? zipCode,
+    bool isDefault = false,
+  }) async {
+    final db = await database;
+    if (isDefault) {
+      final result =
+      await db.query('shipping_addresses', where: 'id = ?', whereArgs: [id]);
+      if (result.isNotEmpty) {
+        await db.update('shipping_addresses', {'isDefault': 0},
+            where: 'userId = ?', whereArgs: [result.first['userId']]);
+      }
+    }
+
+    return await db.update(
+      'shipping_addresses',
+      {
+        'label': label,
+        'fullAddress': fullAddress,
+        'city': city ?? '',
+        'state': state ?? '',
+        'zipCode': zipCode ?? '',
+        'isDefault': isDefault ? 1 : 0,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  static Future<int> deleteAddress(int id) async {
+    final db = await database;
+    return await db.delete('shipping_addresses', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> setDefaultAddress(int userId, int addressId) async {
+    final db = await database;
+    await db.update('shipping_addresses', {'isDefault': 0},
+        where: 'userId = ?', whereArgs: [userId]);
+    await db.update('shipping_addresses', {'isDefault': 1},
+        where: 'id = ?', whereArgs: [addressId]);
+  }
+
+  // =============================
+// 🧩 BỔ SUNG HÀM PHỤC VỤ MÀN HÌNH ĐƠN HÀNG
+// =============================
+
+  /// Lấy danh sách đơn của user (kèm tổng số lượng, ảnh sản phẩm đầu tiên)
+  static Future<List<Map<String, dynamic>>> getOrdersByUserSummary(int userId) async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT 
+        o.id,
+        o.orderCode,
+        o.status,
+        o.finalAmount,
+        o.totalAmount,
+        o.discountAmount,
+        o.paymentMethod,
+        o.note,
+        o.createdAt,
+        COALESCE(SUM(oi.quantity), 0) AS itemsCount,
+        COALESCE((
+          SELECT p.images 
+          FROM order_items oi2 
+          JOIN products p ON p.id = oi2.productId 
+          WHERE oi2.orderId = o.id 
+          LIMIT 1
+        ), '') AS firstImage
+      FROM orders o
+      LEFT JOIN order_items oi ON oi.orderId = o.id
+      WHERE o.userId = ?
+      GROUP BY o.id
+      ORDER BY o.createdAt DESC
+    ''', [userId]);
+    return res;
+  }
+
+  /// Lấy chi tiết 1 đơn (gồm sản phẩm có ảnh, size, màu, note, payment)
+  static Future<Map<String, dynamic>?> getOrderDetail(int orderId) async {
+    final db = await database;
+    final orders = await db.query('orders', where: 'id = ?', whereArgs: [orderId]);
+    if (orders.isEmpty) return null;
+
+    final items = await db.rawQuery('''
+      SELECT 
+        oi.*,
+        p.images AS productImages
+      FROM order_items oi
+      LEFT JOIN products p ON p.id = oi.productId
+      WHERE oi.orderId = ?
+    ''', [orderId]);
+
+    return {
+      'order': orders.first,
+      'items': items,
+    };
+  }
+
+  /// Hủy đơn (chuyển sang trạng thái cancelled)
+  static Future<void> cancelOrder(int orderId) async {
+    final db = await database;
+    await db.update('orders', {
+      'status': 'cancelled',
+      'updatedAt': DateTime.now().toIso8601String(),
+    }, where: 'id = ?', whereArgs: [orderId]);
+  }
+
+  /// Xóa đơn (order_items sẽ tự xóa nhờ ON DELETE CASCADE)
+  static Future<void> deleteOrder(int orderId) async {
+    final db = await database;
+    await db.delete('orders', where: 'id = ?', whereArgs: [orderId]);
+  }
+
+  /// Thêm lại toàn bộ sản phẩm của đơn vào giỏ hàng user
+  static Future<void> addOrderBackToCart({required int userId, required int orderId}) async {
+    final db = await database;
+    final items = await db.rawQuery('SELECT * FROM order_items WHERE orderId = ?', [orderId]);
+    for (final it in items) {
+      await addToCart(
+        userId: userId,
+        productId: (it['productId'] as num).toInt(),
+        quantity: (it['quantity'] as num).toInt(),
+        size: it['size']?.toString(),
+        color: it['color']?.toString(),
+      );
+    }
+  }
 }
+

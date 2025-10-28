@@ -11,6 +11,8 @@ import 'package:path/path.dart' as p;
 
 import '../database/db_helper.dart';
 import 'product_detail_screen.dart';
+import 'cart_screen.dart';
+import 'account_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String fullName;
@@ -1056,11 +1058,27 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _buildHomeScreen();
       case 1:
-        return _buildCartScreen();
+        return CartScreen(userId: widget.userId);
       case 2:
         return _buildWishlistScreen();
       case 3:
-        return _buildProfileScreen();
+      // Tải thông tin người dùng hiện tại từ database
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: DBHelper.getUserById(widget.userId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Lỗi khi tải tài khoản: ${snapshot.error}'));
+            }
+            final user = snapshot.data;
+            if (user == null) {
+              return const Center(child: Text('Không tìm thấy thông tin người dùng'));
+            }
+            return AccountScreen(user: user);
+          },
+        );
       default:
         return _buildHomeScreen();
     }
