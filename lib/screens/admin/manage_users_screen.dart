@@ -23,6 +23,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     try {
       final list = await DBHelper.getAllUsers();
       setState(() => users = list);
+      print('✅ Loaded ${list.length} users');
     } catch (e) {
       _showError('Lỗi tải danh sách người dùng: $e');
     } finally {
@@ -56,65 +57,129 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     final nameCtrl = TextEditingController(text: user['fullName']);
     final emailCtrl = TextEditingController(text: user['email']);
     final phoneCtrl = TextEditingController(text: user['phone']);
-    bool isAdmin = user['isAdmin'] == 1;
+    final passwordCtrl = TextEditingController();
+    final confirmPasswordCtrl = TextEditingController();
+
+    bool isAdmin = (user['role'] == 'admin');
+    bool showPasswordFields = false;
+    bool obscurePassword = true;
+    bool obscureConfirmPassword = true;
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cập nhật người dùng'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Họ tên'),
-              ),
-              TextField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email'),
-                enabled: false, // Không cho phép đổi email
-              ),
-              TextField(
-                controller: phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Số điện thoại'),
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Quyền Admin'),
-                value: isAdmin,
-                onChanged: (value) => setState(() => isAdmin = value),
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Cập nhật người dùng'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Họ tên'),
+                ),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  enabled: false,
+                ),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Đổi mật khẩu'),
+                  value: showPasswordFields,
+                  onChanged: (v) => setState(() => showPasswordFields = v),
+                ),
+                if (showPasswordFields) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: passwordCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Mật khẩu mới',
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () =>
+                            setState(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                    obscureText: obscurePassword,
+                  ),
+                  TextField(
+                    controller: confirmPasswordCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Xác nhận mật khẩu mới',
+                      suffixIcon: IconButton(
+                        icon: Icon(obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () => setState(() =>
+                        obscureConfirmPassword = !obscureConfirmPassword),
+                      ),
+                    ),
+                    obscureText: obscureConfirmPassword,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Quyền Admin'),
+                  value: isAdmin,
+                  onChanged: (v) => setState(() => isAdmin = v),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await DBHelper.updateUser(
-                  user['id'],
-                  nameCtrl.text.trim(),
-                  emailCtrl.text.trim(),
-                  phoneCtrl.text.trim(),
-                  isAdmin,
-                );
-                if (mounted) {
-                  Navigator.pop(context);
-                  await _loadUsers();
-                  _showSuccess('Đã cập nhật thông tin người dùng');
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  if (showPasswordFields) {
+                    final newPass = passwordCtrl.text.trim();
+                    final confirm = confirmPasswordCtrl.text.trim();
+                    if (newPass.isEmpty || confirm.isEmpty) {
+                      _showError('Vui lòng nhập đầy đủ mật khẩu mới');
+                      return;
+                    }
+                    if (newPass != confirm) {
+                      _showError('Mật khẩu xác nhận không khớp');
+                      return;
+                    }
+                    if (newPass.length < 8) {
+                      _showError('Mật khẩu phải có ít nhất 8 ký tự');
+                      return;
+                    }
+                    await DBHelper.updatePassword(
+                        emailCtrl.text.trim(), newPass);
+                  }
+
+                  await DBHelper.updateUser(
+                    user['id'],
+                    nameCtrl.text.trim(),
+                    emailCtrl.text.trim(),
+                    phoneCtrl.text.trim(),
+                    isAdmin,
+                  );
+                  if (mounted) {
+                    Navigator.pop(context);
+                    await _loadUsers();
+                    _showSuccess('Đã cập nhật người dùng');
+                  }
+                } catch (e) {
+                  _showError('Lỗi cập nhật: $e');
                 }
-              } catch (e) {
-                _showError('Lỗi cập nhật: $e');
-              }
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
+              },
+              child: const Text('Lưu'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -124,80 +189,132 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     final emailCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
+    final confirmPasswordCtrl = TextEditingController();
     bool isAdmin = false;
+    bool obscurePassword = true;
+    bool obscureConfirmPassword = true;
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thêm người dùng mới'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Họ tên *'),
-              ),
-              TextField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email *'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              TextField(
-                controller: passwordCtrl,
-                decoration: const InputDecoration(labelText: 'Mật khẩu *'),
-                obscureText: true,
-              ),
-              TextField(
-                controller: phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Quyền Admin'),
-                value: isAdmin,
-                onChanged: (value) => setState(() => isAdmin = value),
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Thêm người dùng mới'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Họ tên *'),
+                ),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: 'Email *'),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                TextField(
+                  controller: passwordCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu *',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  obscureText: obscurePassword,
+                ),
+                TextField(
+                  controller: confirmPasswordCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Xác nhận mật khẩu *',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => setState(() =>
+                      obscureConfirmPassword = !obscureConfirmPassword),
+                    ),
+                  ),
+                  obscureText: obscureConfirmPassword,
+                ),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Quyền Admin'),
+                  value: isAdmin,
+                  onChanged: (v) => setState(() => isAdmin = v),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              final email = emailCtrl.text.trim();
-              final password = passwordCtrl.text;
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                final email = emailCtrl.text.trim().toLowerCase();
+                final password = passwordCtrl.text;
+                final confirm = confirmPasswordCtrl.text;
 
-              if (name.isEmpty || email.isEmpty || password.isEmpty) {
-                _showError('Vui lòng điền đầy đủ thông tin bắt buộc');
-                return;
-              }
-
-              try {
-                await DBHelper.createUser(
-                  name,
-                  email,
-                  password,
-                  phoneCtrl.text.trim(),
-                  isAdmin,
-                );
-                if (mounted) {
-                  Navigator.pop(context);
-                  await _loadUsers();
-                  _showSuccess('Đã thêm người dùng mới');
+                if (name.isEmpty ||
+                    email.isEmpty ||
+                    password.isEmpty ||
+                    confirm.isEmpty) {
+                  _showError('Vui lòng điền đầy đủ thông tin bắt buộc');
+                  return;
                 }
-              } catch (e) {
-                _showError('Lỗi tạo người dùng: $e');
-              }
-            },
-            child: const Text('Thêm'),
-          ),
-        ],
+
+                if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email)) {
+                  _showError('Email không hợp lệ');
+                  return;
+                }
+
+                if (password.length < 6) {
+                  _showError('Mật khẩu phải có ít nhất 6 ký tự');
+                  return;
+                }
+
+                if (password != confirm) {
+                  _showError('Mật khẩu xác nhận không khớp');
+                  return;
+                }
+
+                try {
+                  final err = await DBHelper.createUser(
+                    name,
+                    email,
+                    password,
+                    phoneCtrl.text.trim(),
+                    isAdmin,
+                  );
+                  if (err != null) {
+                    _showError(err);
+                    return;
+                  }
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    await _loadUsers();
+                    _showSuccess('Đã thêm người dùng mới');
+                  }
+                } catch (e) {
+                  _showError('Lỗi tạo người dùng: $e');
+                }
+              },
+              child: const Text('Thêm'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -209,82 +326,79 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Quản lý người dùng'),
+      ),
       body: users.isEmpty
           ? const Center(child: Text('Chưa có người dùng nào'))
           : ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                return Card(
-                  margin: const EdgeInsets.all(8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey[200],
-                      child: const Icon(Icons.person),
+        itemCount: users.length,
+        itemBuilder: (context, index) {
+          final user = users[index];
+          return Card(
+            margin: const EdgeInsets.all(8),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.grey[200],
+                child: const Icon(Icons.person),
+              ),
+              title: Text(user['fullName'] ?? 'Chưa có tên'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(user['email'] ?? ''),
+                  Text(user['phone'] ?? 'Chưa có SĐT'),
+                  if (user['role'] == 'admin')
+                    const Chip(
+                      label: Text(
+                        'Admin',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.redAccent,
                     ),
-                    title: Text(user['fullName'] ?? 'Chưa có tên'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(user['email'] ?? ''),
-                        Text(user['phone'] ?? 'Chưa có SĐT'),
-                        if (user['isAdmin'] == 1)
-                          const Chip(
-                            label: Text(
-                              'Admin',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            backgroundColor: Colors.redAccent,
-                          ),
-                      ],
-                    ),
-                    trailing: PopupMenuButton(
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Xóa'),
+                ],
+              ),
+              trailing: PopupMenuButton(
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                  PopupMenuItem(value: 'delete', child: Text('Xóa')),
+                ],
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _updateUser(user);
+                  } else if (value == 'delete') {
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Xác nhận xóa'),
+                        content: const Text(
+                          'Bạn có chắc muốn xóa người dùng này?',
                         ),
-                      ],
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'edit':
-                            _updateUser(user);
-                            break;
-                          case 'delete':
-                            showDialog(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Xác nhận xóa'),
-                                content: const Text(
-                                  'Bạn có chắc muốn xóa người dùng này?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Hủy'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      _deleteUser(user['id']);
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                    ),
-                                    child: const Text('Xóa'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            break;
-                        }
-                      },
-                    ),
-                  ),
-                );
-              },
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Hủy'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _deleteUser(user['id']);
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Xóa'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addUser,
         child: const Icon(Icons.person_add),

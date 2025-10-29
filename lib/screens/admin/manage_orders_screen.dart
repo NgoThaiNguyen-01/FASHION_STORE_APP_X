@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../database/db_helper.dart';
 
 class ManageOrdersScreen extends StatefulWidget {
-  const ManageOrdersScreen({super.key});
+  final VoidCallback? onRefresh;
+  const ManageOrdersScreen({super.key, this.onRefresh});
 
   @override
   State<ManageOrdersScreen> createState() => _ManageOrdersScreenState();
@@ -10,7 +11,9 @@ class ManageOrdersScreen extends StatefulWidget {
 
 class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
   List<Map<String, dynamic>> orders = [];
+  Map<int, List<Map<String, dynamic>>> orderItems = {};
   bool isLoading = true;
+  String? filterStatus;
 
   @override
   void initState() {
@@ -21,12 +24,38 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
   Future<void> _loadOrders() async {
     setState(() => isLoading = true);
     try {
-      final list = await DBHelper.getAllOrders();
-      setState(() => orders = list);
+      final list = filterStatus != null
+          ? await DBHelper.getOrdersByStatus(filterStatus!)
+          : await DBHelper.getAllOrders();
+      setState(() {
+        orders = list;
+        orderItems.clear();
+      });
     } catch (e) {
       _showError('Lỗi tải danh sách đơn hàng: $e');
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _updateOrderStatus(int orderId, String newStatus) async {
+    try {
+      await DBHelper.updateOrderStatus(orderId, newStatus);
+      if (newStatus == 'delivered') await DBHelper.completeOrder(orderId);
+      await _loadOrders();
+      widget.onRefresh?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            newStatus == 'delivered'
+                ? 'Đơn hàng đã hoàn tất và cập nhật kho'
+                : 'Đã cập nhật trạng thái đơn hàng',
+          ),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      _showError('Lỗi cập nhật trạng thái: $e');
     }
   }
 
@@ -36,22 +65,9 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
     );
   }
 
-  Future<void> _updateOrderStatus(int orderId, String newStatus) async {
-    try {
-      await DBHelper.updateOrderStatus(orderId, newStatus);
-      await _loadOrders();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật trạng thái đơn hàng')),
-        );
-      }
-    } catch (e) {
-      _showError('Lỗi cập nhật trạng thái: $e');
-    }
-  }
-
   String _getStatusText(String status) {
-    switch (status) {
+    final s = status.toLowerCase().trim();
+    switch (s) {
       case 'pending':
         return 'Chờ xử lý';
       case 'processing':
@@ -59,13 +75,17 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
       case 'shipped':
         return 'Đang giao';
       case 'delivered':
-        return 'Hoàn thành';
+      case 'complete':
+      case 'completed':
+        return 'Hoàn tất';
       case 'cancelled':
+      case 'canceled':
         return 'Đã hủy';
       default:
         return 'Không xác định';
     }
   }
+
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -86,117 +106,114 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (orders.isEmpty) {
-      return const Center(child: Text('Chưa có đơn hàng nào'));
-    }
-
-    return ListView.builder(
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        final status = order['status'] as String;
-
-        return Card(
-          margin: const EdgeInsets.all(8),
-          child: ExpansionTile(
-            title: Row(
-              children: [
-                Text('#${order['id']}'),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text(
-                    _getStatusText(status),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  backgroundColor: _getStatusColor(status),
-                ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Khách hàng: ${order['customerName']}'),
-                Text('Tổng tiền: ${order['totalAmount']}₫'),
-                Text('Ngày đặt: ${order['orderDate']}'),
-              ],
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Cập nhật trạng thái:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        ActionChip(
-                          label: const Text('Chờ xử lý'),
-                          onPressed: () =>
-                              _updateOrderStatus(order['id'], 'pending'),
-                          backgroundColor: status == 'pending'
-                              ? Colors.grey
-                              : null,
-                        ),
-                        ActionChip(
-                          label: const Text('Đang xử lý'),
-                          onPressed: () =>
-                              _updateOrderStatus(order['id'], 'processing'),
-                          backgroundColor: status == 'processing'
-                              ? Colors.blue
-                              : null,
-                        ),
-                        ActionChip(
-                          label: const Text('Đang giao'),
-                          onPressed: () =>
-                              _updateOrderStatus(order['id'], 'shipped'),
-                          backgroundColor: status == 'shipped'
-                              ? Colors.orange
-                              : null,
-                        ),
-                        ActionChip(
-                          label: const Text('Hoàn thành'),
-                          onPressed: () =>
-                              _updateOrderStatus(order['id'], 'delivered'),
-                          backgroundColor: status == 'delivered'
-                              ? Colors.green
-                              : null,
-                        ),
-                        ActionChip(
-                          label: const Text('Hủy đơn'),
-                          onPressed: () =>
-                              _updateOrderStatus(order['id'], 'cancelled'),
-                          backgroundColor: status == 'cancelled'
-                              ? Colors.red
-                              : null,
-                        ),
-                      ],
-                    ),
-                    const Divider(),
-                    const Text(
-                      'Chi tiết đơn hàng:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    // TODO: Hiển thị danh sách sản phẩm trong đơn hàng
-                    Text('Địa chỉ: ${order['address']}'),
-                    Text('Số điện thoại: ${order['phone']}'),
-                    Text('Ghi chú: ${order['note'] ?? 'Không có'}'),
-                  ],
-                ),
-              ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(filterStatus != null
+            ? 'Đơn hàng ${_getStatusText(filterStatus!).toLowerCase()}'
+            : 'Tất cả đơn hàng'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => _showFilterSheet(),
           ),
-        );
-      },
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadOrders),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : orders.isEmpty
+          ? const Center(child: Text('Chưa có đơn hàng nào'))
+          : ListView.builder(
+        itemCount: orders.length,
+        itemBuilder: (context, i) {
+          final order = orders[i];
+          final status = order['status'] as String;
+          return Card(
+            margin: const EdgeInsets.all(8),
+            child: ExpansionTile(
+              title: Row(
+                children: [
+                  Text('#${order['id']}'),
+                  const SizedBox(width: 8),
+                  Chip(
+                    label: Text(
+                      _getStatusText(status),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: _getStatusColor(status),
+                  ),
+                ],
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Khách hàng: ${order['customerName']}'),
+                  Text(
+                      'Tổng tiền: ${(order['totalAmount'] as num).toStringAsFixed(0)}₫'),
+                  Text(
+                      'Ngày đặt: ${order['createdAt']?.toString().substring(0, 16) ?? 'N/A'}'),
+                ],
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      ActionChip(
+                        label: const Text('Hoàn tất'),
+                        onPressed: () => _updateOrderStatus(
+                            order['id'], 'delivered'),
+                        backgroundColor: status == 'delivered'
+                            ? Colors.green
+                            : null,
+                      ),
+                      ActionChip(
+                        label: const Text('Hủy đơn'),
+                        onPressed: () => _updateOrderStatus(
+                            order['id'], 'cancelled'),
+                        backgroundColor: status == 'cancelled'
+                            ? Colors.red
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Tất cả đơn hàng'),
+              onTap: () {
+                this.setState(() => filterStatus = null);
+                Navigator.pop(context);
+                _loadOrders();
+              },
+            ),
+            ...['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+                .map((s) => ListTile(
+              title: Text(_getStatusText(s)),
+              onTap: () {
+                this.setState(() => filterStatus = s);
+                Navigator.pop(context);
+                _loadOrders();
+              },
+            )),
+          ],
+        ),
+      ),
     );
   }
 }

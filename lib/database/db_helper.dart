@@ -14,8 +14,14 @@ class DBHelper {
   // =============================
   static Future<Database> get database async {
     if (_db != null) return _db!;
-    _db = await _initDB('fashion_store_db_v5.sqlite'); // giữ tên file cũ
+    _db = await _initDB('fashion_store_db_v5.sqlite'); // giữ tên file
     return _db!;
+  }
+
+  static Future<void> logDbPath() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final path = join(dir.path, 'fashion_store_db_v5.sqlite');
+    print('📁 DB path = $path');
   }
 
   static Future<Database> _initDB(String fileName) async {
@@ -24,7 +30,7 @@ class DBHelper {
 
     return openDatabase(
       path,
-      version: 6, // 🔺 bump version để migrate tạo bảng địa chỉ
+      version: 7, // 🔺 bump version: v7 bổ sung unique review + API review
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -155,6 +161,7 @@ class DBHelper {
       )
     ''');
 
+    // ✅ reviews: thêm unique (userId, productId)
     await db.execute('''
       CREATE TABLE reviews (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +175,7 @@ class DBHelper {
         FOREIGN KEY (productId) REFERENCES products(id)
       )
     ''');
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_unique_user_product ON reviews(userId, productId)');
 
     await db.execute('''
       CREATE TABLE statistics (
@@ -204,10 +212,10 @@ class DBHelper {
   // 3️⃣ NÂNG CẤP DATABASE
   // =============================
   static Future<void> _upgradeDatabase(
-    Database db,
-    int oldVersion,
-    int newVersion,
-  ) async {
+      Database db,
+      int oldVersion,
+      int newVersion,
+      ) async {
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS orders (
@@ -263,35 +271,23 @@ class DBHelper {
 
     if (oldVersion < 3) {
       try {
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN quantity INTEGER DEFAULT 0',
-        );
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN status INTEGER DEFAULT 1',
-        );
+        await db.execute('ALTER TABLE products ADD COLUMN quantity INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE products ADD COLUMN status INTEGER DEFAULT 1');
         await db.execute('ALTER TABLE products ADD COLUMN sizes TEXT');
         await db.execute('ALTER TABLE products ADD COLUMN colors TEXT');
         await db.execute('ALTER TABLE products ADD COLUMN material TEXT');
         await db.execute('ALTER TABLE products ADD COLUMN weight REAL');
         await db.execute('ALTER TABLE products ADD COLUMN tags TEXT');
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN viewCount INTEGER DEFAULT 0',
-        );
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN soldCount INTEGER DEFAULT 0',
-        );
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP',
-        );
+        await db.execute('ALTER TABLE products ADD COLUMN viewCount INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE products ADD COLUMN soldCount INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE products ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP');
 
         await db.execute('ALTER TABLE users ADD COLUMN phone TEXT');
         await db.execute('ALTER TABLE users ADD COLUMN address TEXT');
         await db.execute('ALTER TABLE users ADD COLUMN avatar TEXT');
 
         await db.execute('ALTER TABLE categories ADD COLUMN image TEXT');
-        await db.execute(
-          'ALTER TABLE categories ADD COLUMN isActive INTEGER DEFAULT 1',
-        );
+        await db.execute('ALTER TABLE categories ADD COLUMN isActive INTEGER DEFAULT 1');
 
         await db.execute('''
           CREATE TABLE IF NOT EXISTS favorites (
@@ -334,29 +330,20 @@ class DBHelper {
 
     if (oldVersion < 4) {
       try {
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN rating REAL DEFAULT 0',
-        );
-        await db.execute(
-          'ALTER TABLE products ADD COLUMN reviewCount INTEGER DEFAULT 0',
-        );
+        await db.execute('ALTER TABLE products ADD COLUMN rating REAL DEFAULT 0');
+        await db.execute('ALTER TABLE products ADD COLUMN reviewCount INTEGER DEFAULT 0');
       } catch (_) {}
     }
 
     if (oldVersion < 5) {
       try {
-        await db.execute(
-          'ALTER TABLE categories ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP',
-        );
+        await db.execute('ALTER TABLE categories ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP');
       } catch (_) {}
       try {
-        await db.execute(
-          'ALTER TABLE users ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP',
-        );
+        await db.execute('ALTER TABLE users ADD COLUMN updatedAt TEXT DEFAULT CURRENT_TIMESTAMP');
       } catch (_) {}
     }
 
-    // 🔺 Thêm ở đây: migrate tạo bảng địa chỉ khi nâng cấp từ các bản cũ
     if (oldVersion < 6) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS shipping_addresses (
@@ -373,6 +360,13 @@ class DBHelper {
           FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
         )
       ''');
+    }
+
+    // 🔺 v7: đảm bảo unique review theo (userId, productId)
+    if (oldVersion < 7) {
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_unique_user_product ON reviews(userId, productId)',
+      );
     }
   }
 
@@ -428,7 +422,7 @@ class DBHelper {
         'price': 250000,
         'oldPrice': 350000,
         'description':
-            'Áo thun nam chất liệu cotton cao cấp, thoáng mát, thấm hút mồ hôi tốt. Phù hợp cho mọi hoạt động hàng ngày.',
+        'Áo thun nam chất liệu cotton cao cấp, thoáng mát, thấm hút mồ hôi tốt. Phù hợp cho mọi hoạt động hàng ngày.',
         'images': jsonEncode([
           'assets/images/product_1_1.jpg',
           'assets/images/product_1_2.jpg',
@@ -451,7 +445,7 @@ class DBHelper {
         'price': 450000,
         'oldPrice': 550000,
         'description':
-            'Quần jean nam dáng slim fit, chất liệu denim co giãn, thoải mái vận động. Màu xanh đậm thời trang.',
+        'Quần jean nam dáng slim fit, chất liệu denim co giãn, thoải mái vận động. Màu xanh đậm thời trang.',
         'images': jsonEncode([
           'assets/images/product_2_1.jpg',
           'assets/images/product_2_2.jpg',
@@ -474,7 +468,7 @@ class DBHelper {
         'price': 380000,
         'oldPrice': 480000,
         'description':
-            'Váy đầm nữ dáng body suit ôm tôn dáng, chất liệu vải mềm mại, phù hợp đi làm và dạo phố.',
+        'Váy đầm nữ dáng body suit ôm tôn dáng, chất liệu vải mềm mại, phù hợp đi làm và dạo phố.',
         'images': jsonEncode([
           'assets/images/product_3_1.jpg',
           'assets/images/product_3_2.jpg',
@@ -497,7 +491,7 @@ class DBHelper {
         'price': 320000,
         'oldPrice': 0,
         'description':
-            'Áo sơ mi nam trắng form regular, chất liệu cotton pha, cổ bẻ, tay dài. Phù hợp mặc công sở.',
+        'Áo sơ mi nam trắng form regular, chất liệu cotton pha, cổ bẻ, tay dài. Phù hợp mặc công sở.',
         'images': jsonEncode([
           'assets/images/product_4_1.jpg',
           'assets/images/product_4_2.jpg',
@@ -520,7 +514,7 @@ class DBHelper {
         'price': 180000,
         'oldPrice': 220000,
         'description':
-            'Áo thun nữ dáng croptop trẻ trung, chất liệu cotton mềm mại, nhiều màu sắc thời trang.',
+        'Áo thun nữ dáng croptop trẻ trung, chất liệu cotton mềm mại, nhiều màu sắc thời trang.',
         'images': jsonEncode([
           'assets/images/product_5_1.jpg',
           'assets/images/product_5_2.jpg',
@@ -584,8 +578,7 @@ class DBHelper {
       'userId': 2,
       'productId': 1,
       'rating': 5,
-      'comment':
-          'Áo rất đẹp, chất liệu tốt, mặc thoải mái. Sẽ ủng hộ shop dài dài!',
+      'comment': 'Áo rất đẹp, chất liệu tốt, mặc thoải mái. Sẽ ủng hộ shop dài dài!',
       'images': jsonEncode([]),
     });
 
@@ -593,8 +586,7 @@ class DBHelper {
       'userId': 2,
       'productId': 2,
       'rating': 4,
-      'comment':
-          'Quần vừa vặn, chất liệu tốt. Nhưng màu hơi khác so với hình ảnh.',
+      'comment': 'Quần vừa vặn, chất liệu tốt. Nhưng màu hơi khác so với hình ảnh.',
       'images': jsonEncode([]),
     });
 
@@ -602,8 +594,7 @@ class DBHelper {
       'userId': 2,
       'productId': 3,
       'rating': 5,
-      'comment':
-          'Váy rất đẹp, form dáng chuẩn. Chất vải mát, mặc đi làm rất phù hợp.',
+      'comment': 'Váy rất đẹp, form dáng chuẩn. Chất vải mát, mặc đi làm rất phù hợp.',
       'images': jsonEncode([]),
     });
   }
@@ -627,10 +618,10 @@ class DBHelper {
   }
 
   static Future<void> addCategory(
-    String name,
-    String? desc, {
-    String? image,
-  }) async {
+      String name,
+      String? desc, {
+        String? image,
+      }) async {
     final db = await database;
     await db.insert('categories', {
       'name': name.trim(),
@@ -640,11 +631,11 @@ class DBHelper {
   }
 
   static Future<void> updateCategory(
-    int id,
-    String name,
-    String? desc, {
-    String? image,
-  }) async {
+      int id,
+      String name,
+      String? desc, {
+        String? image,
+      }) async {
     final db = await database;
     await db.update(
       'categories',
@@ -686,8 +677,8 @@ class DBHelper {
   }
 
   static Future<List<Map<String, dynamic>>> getProductsByCategory(
-    int categoryId,
-  ) async {
+      int categoryId,
+      ) async {
     final db = await database;
     return db.query(
       'products',
@@ -698,8 +689,8 @@ class DBHelper {
   }
 
   static Future<List<Map<String, dynamic>>> getProductsWithStatus(
-    int status,
-  ) async {
+      int status,
+      ) async {
     final db = await database;
     return db.query(
       'products',
@@ -745,9 +736,9 @@ class DBHelper {
   }
 
   static Future<void> updateProduct(
-    int id,
-    Map<String, dynamic> product,
-  ) async {
+      int id,
+      Map<String, dynamic> product,
+      ) async {
     final db = await database;
     await db.update(
       'products',
@@ -911,9 +902,9 @@ class DBHelper {
   }
 
   static Future<Map<String, dynamic>?> login(
-    String email,
-    String password,
-  ) async {
+      String email,
+      String password,
+      ) async {
     final db = await database;
     email = email.trim().toLowerCase();
     final users = await db.query(
@@ -939,10 +930,43 @@ class DBHelper {
     };
   }
 
+  static Future<Map<String, dynamic>> loginAdmin(
+      String email,
+      String password,
+      ) async {
+    final db = await database;
+    email = email.trim().toLowerCase();
+    final users = await db.query(
+      'users',
+      where: 'email = ? AND role = ?',
+      whereArgs: [email, 'admin'],
+    );
+
+    if (users.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Tài khoản không tồn tại hoặc không phải quản trị viên',
+      };
+    }
+
+    final user = users.first;
+    final hash = user['passwordHash'] as String;
+
+    if (!BCrypt.checkpw(password, hash)) {
+      return {'success': false, 'message': 'Sai mật khẩu'};
+    }
+
+    return {
+      'success': true,
+      'userId': user['id'],
+      'fullName': user['fullName'],
+    };
+  }
+
   static Future<bool> updateUserProfile(
-    int userId,
-    Map<String, dynamic> profile,
-  ) async {
+      int userId,
+      Map<String, dynamic> profile,
+      ) async {
     final db = await database;
     final res = await db.update(
       'users',
@@ -979,19 +1003,20 @@ class DBHelper {
     final monthStart = DateTime(now.year, now.month, 1);
 
     // Revenue & orders
-    final totalRevenue = await db.rawQuery(
-      'SELECT COALESCE(SUM(finalAmount), 0) as total FROM orders WHERE status = ?',
-      ['completed'],
-    );
-    final totalOrders = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders',
-    );
+    final revenueStats = await db.rawQuery('''
+      SELECT
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN finalAmount ELSE 0 END), 0) as totalCompleted,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN finalAmount ELSE 0 END), 0) as totalAll,
+        COUNT(*) as orderCount,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completedCount
+      FROM orders
+    ''');
 
     final todayStats = await db.rawQuery(
       '''
       SELECT 
-        COALESCE(SUM(finalAmount), 0) as revenue,
-        COUNT(*) as orders
+        COALESCE(SUM(COALESCE(finalAmount, 0)), 0) as revenue,
+        COALESCE(COUNT(*), 0) as orders
       FROM orders 
       WHERE date(createdAt) = date(?) AND status != ?
     ''',
@@ -1001,8 +1026,8 @@ class DBHelper {
     final weekStats = await db.rawQuery(
       '''
       SELECT 
-        COALESCE(SUM(finalAmount), 0) as revenue,
-        COUNT(*) as orders
+        COALESCE(SUM(COALESCE(finalAmount, 0)), 0) as revenue,
+        COALESCE(COUNT(*), 0) as orders
       FROM orders 
       WHERE date(createdAt) >= date(?) AND status != ?
     ''',
@@ -1012,8 +1037,8 @@ class DBHelper {
     final monthStats = await db.rawQuery(
       '''
       SELECT 
-        COALESCE(SUM(finalAmount), 0) as revenue,
-        COUNT(*) as orders
+        COALESCE(SUM(COALESCE(finalAmount, 0)), 0) as revenue,
+        COALESCE(COUNT(*), 0) as orders
       FROM orders 
       WHERE date(createdAt) >= date(?) AND status != ?
     ''',
@@ -1022,9 +1047,7 @@ class DBHelper {
 
     // Order status counts
     final orderStatusCounts = await db.rawQuery('''
-      SELECT 
-        status,
-        COUNT(*) as count
+      SELECT status, COALESCE(COUNT(*), 0) as count
       FROM orders
       GROUP BY status
     ''');
@@ -1032,82 +1055,94 @@ class DBHelper {
     // Products stats
     final productStats = await db.rawQuery('''
       SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN quantity <= 10 AND quantity > 0 AND status = 1 THEN 1 ELSE 0 END) as lowStock,
-        SUM(CASE WHEN quantity = 0 OR status = 0 THEN 1 ELSE 0 END) as outOfStock,
-        SUM(CASE WHEN discount > 0 THEN 1 ELSE 0 END) as onSale
+        COALESCE(COUNT(*), 0) as total,
+        COALESCE(SUM(CASE WHEN quantity <= 10 AND quantity > 0 AND status = 1 THEN 1 ELSE 0 END), 0) as lowStock,
+        COALESCE(SUM(CASE WHEN quantity = 0 OR status = 0 THEN 1 ELSE 0 END), 0) as outOfStock,
+        COALESCE(SUM(CASE WHEN discount > 0 THEN 1 ELSE 0 END), 0) as onSale
       FROM products
     ''');
 
     final totalCustomers = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM users WHERE role = ?',
+      'SELECT COALESCE(COUNT(*), 0) as count FROM users WHERE role = ?',
       ['khach_hang'],
     );
 
+    int _asInt(Map<String, Object?> row, String k) =>
+        (row[k] as num?)?.toInt() ?? 0;
+    double _asDouble(Map<String, Object?> row, String k) =>
+        (row[k] as num?)?.toDouble() ?? 0.0;
+
     return {
-      'totalRevenue': (totalRevenue.first['total'] as num?)?.toDouble() ?? 0.0,
-      'totalOrders': (totalOrders.first['count'] as num?)?.toInt() ?? 0,
-      'totalCustomers': (totalCustomers.first['count'] as num?)?.toInt() ?? 0,
-      'totalProducts': (productStats.first['total'] as num?)?.toInt() ?? 0,
+      'totalRevenue':
+      _asDouble(revenueStats.first, 'totalCompleted'),
+      'totalOrders': _asInt(revenueStats.first, 'orderCount'),
+      'totalCustomers': _asInt(totalCustomers.first, 'count'),
+      'totalProducts': _asInt(productStats.first, 'total'),
 
-      'todayRevenue': (todayStats.first['revenue'] as num?)?.toDouble() ?? 0.0,
-      'todayOrders': (todayStats.first['orders'] as num?)?.toInt() ?? 0,
-      'weekRevenue': (weekStats.first['revenue'] as num?)?.toDouble() ?? 0.0,
-      'weekOrders': (weekStats.first['orders'] as num?)?.toInt() ?? 0,
-      'monthRevenue': (monthStats.first['revenue'] as num?)?.toDouble() ?? 0.0,
-      'monthOrders': (monthStats.first['orders'] as num?)?.toInt() ?? 0,
+      'todayRevenue': _asDouble(todayStats.first, 'revenue'),
+      'todayOrders': _asInt(todayStats.first, 'orders'),
+      'weekRevenue': _asDouble(weekStats.first, 'revenue'),
+      'weekOrders': _asInt(weekStats.first, 'orders'),
+      'monthRevenue': _asDouble(monthStats.first, 'revenue'),
+      'monthOrders': _asInt(monthStats.first, 'orders'),
 
-      'pendingOrders':
-          orderStatusCounts.firstWhere(
+      'pendingOrders': (orderStatusCounts.firstWhere(
             (e) => e['status'] == 'pending',
-            orElse: () => {'count': 0},
-          )['count'] ??
-          0,
-      'processingOrders':
-          orderStatusCounts.firstWhere(
+        orElse: () => {'count': 0},
+      )['count'] as num?)?.toInt() ?? 0,
+      'processingOrders': (orderStatusCounts.firstWhere(
             (e) => e['status'] == 'processing',
-            orElse: () => {'count': 0},
-          )['count'] ??
-          0,
-      'shippedOrders':
-          orderStatusCounts.firstWhere(
+        orElse: () => {'count': 0},
+      )['count'] as num?)?.toInt() ?? 0,
+      'shippedOrders': (orderStatusCounts.firstWhere(
             (e) => e['status'] == 'shipped',
-            orElse: () => {'count': 0},
-          )['count'] ??
-          0,
-      'deliveredOrders':
-          orderStatusCounts.firstWhere(
+        orElse: () => {'count': 0},
+      )['count'] as num?)?.toInt() ?? 0,
+      'deliveredOrders': (orderStatusCounts.firstWhere(
             (e) => e['status'] == 'delivered',
-            orElse: () => {'count': 0},
-          )['count'] ??
-          0,
-      'cancelledOrders':
-          orderStatusCounts.firstWhere(
+        orElse: () => {'count': 0},
+      )['count'] as num?)?.toInt() ?? 0,
+      'cancelledOrders': (orderStatusCounts.firstWhere(
             (e) => e['status'] == 'cancelled',
-            orElse: () => {'count': 0},
-          )['count'] ??
-          0,
+        orElse: () => {'count': 0},
+      )['count'] as num?)?.toInt() ?? 0,
 
       'inStockProducts':
-          ((productStats.first['total'] as num?)?.toInt() ?? 0) -
-          ((productStats.first['lowStock'] as num?)?.toInt() ?? 0) -
-          ((productStats.first['outOfStock'] as num?)?.toInt() ?? 0),
-      'lowStockProducts':
-          (productStats.first['lowStock'] as num?)?.toInt() ?? 0,
-      'outOfStockProducts':
-          (productStats.first['outOfStock'] as num?)?.toInt() ?? 0,
-      'onSaleProducts': (productStats.first['onSale'] as num?)?.toInt() ?? 0,
+      _asInt(productStats.first, 'total') -
+          _asInt(productStats.first, 'lowStock') -
+          _asInt(productStats.first, 'outOfStock'),
+      'lowStockProducts': _asInt(productStats.first, 'lowStock'),
+      'outOfStockProducts': _asInt(productStats.first, 'outOfStock'),
+      'onSaleProducts': _asInt(productStats.first, 'onSale'),
     };
   }
 
-  static Future<void> createUser(
-    String fullName,
-    String email,
-    String password,
-    String? phone,
-    bool isAdmin,
-  ) async {
+  static Future<String?> createUser(
+      String fullName,
+      String email,
+      String password,
+      String? phone,
+      bool isAdmin,
+      ) async {
+    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email)) {
+      return 'Email không hợp lệ';
+    }
+    if (password.length < 6) {
+      return 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+
     final db = await database;
+
+    final exists = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email.trim().toLowerCase()],
+    );
+
+    if (exists.isNotEmpty) {
+      return 'Email đã được sử dụng';
+    }
+
     final hash = BCrypt.hashpw(password, BCrypt.gensalt());
     await db.insert('users', {
       'fullName': fullName.trim(),
@@ -1118,15 +1153,17 @@ class DBHelper {
       'createdAt': DateTime.now().toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),
     });
+
+    return null;
   }
 
   static Future<void> updateUser(
-    int id,
-    String fullName,
-    String email,
-    String? phone,
-    bool isAdmin,
-  ) async {
+      int id,
+      String fullName,
+      String email,
+      String? phone,
+      bool isAdmin,
+      ) async {
     final db = await database;
     await db.update(
       'users',
@@ -1173,8 +1210,8 @@ class DBHelper {
   }
 
   static Future<List<Map<String, dynamic>>> getOrdersByStatus(
-    String status,
-  ) async {
+      String status,
+      ) async {
     final db = await database;
     return db.query(
       'orders',
@@ -1205,16 +1242,14 @@ class DBHelper {
   static Future<Map<String, dynamic>> getDashboardStats() async {
     final db = await database;
 
-    final totalProducts = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM products',
-    );
+    final totalProducts =
+    await db.rawQuery('SELECT COUNT(*) as count FROM products');
     final totalUsers = await db.rawQuery(
       'SELECT COUNT(*) as count FROM users WHERE role = ?',
       ['khach_hang'],
     );
-    final totalOrders = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM orders',
-    );
+    final totalOrders =
+    await db.rawQuery('SELECT COUNT(*) as count FROM orders');
     final totalRevenue = await db.rawQuery(
       'SELECT SUM(finalAmount) as total FROM orders WHERE status = ?',
       ['completed'],
@@ -1267,11 +1302,11 @@ class DBHelper {
   }
 
   // =============================
-  // 11️⃣ QUẢN LÝ ĐÁNH GIÁ
+  // 11️⃣ QUẢN LÝ ĐÁNH GIÁ (mở rộng)
   // =============================
   static Future<List<Map<String, dynamic>>> getProductReviews(
-    int productId,
-  ) async {
+      int productId,
+      ) async {
     final db = await database;
     return db.rawQuery(
       '''
@@ -1283,6 +1318,111 @@ class DBHelper {
     ''',
       [productId],
     );
+  }
+
+  /// Kiểm tra user đã từng mua (đơn completed/delivered) sản phẩm này chưa
+  static Future<bool> hasUserPurchasedProduct({
+    required int userId,
+    required int productId,
+  }) async {
+    final db = await database;
+    final res = await db.rawQuery(
+      '''
+      SELECT COUNT(*) AS c
+      FROM orders o
+      JOIN order_items oi ON oi.orderId = o.id
+      WHERE o.userId = ? 
+        AND oi.productId = ?
+        AND (o.status = 'completed' OR o.status = 'delivered')
+    ''',
+      [userId, productId],
+    );
+    final count = (res.first['c'] as num?)?.toInt() ?? 0;
+    return count > 0;
+  }
+
+  /// Lấy các item trong đơn mà user chưa review
+  static Future<List<Map<String, dynamic>>> getOrderItemsNeedingReview({
+    required int userId,
+    required int orderId,
+  }) async {
+    final db = await database;
+    return db.rawQuery(
+      '''
+      SELECT oi.*, p.images AS productImages
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.orderId
+      LEFT JOIN products p ON p.id = oi.productId
+      LEFT JOIN reviews r ON r.userId = o.userId AND r.productId = oi.productId
+      WHERE oi.orderId = ?
+        AND o.userId = ?
+        AND r.id IS NULL
+    ''',
+      [orderId, userId],
+    );
+  }
+
+  /// Upsert review (1 user chỉ 1 review / 1 product). Sau khi thêm/cập nhật -> update rating.
+  static Future<void> addOrUpdateReview({
+    required int userId,
+    required int productId,
+    required int rating,
+    String? comment,
+    String? images,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // đảm bảo user có mua hàng rồi mới cho review (có thể tắt điều kiện này nếu bạn không muốn bắt buộc)
+      final purchased = await txn.rawQuery(
+        '''
+        SELECT COUNT(*) AS c
+        FROM orders o
+        JOIN order_items oi ON oi.orderId = o.id
+        WHERE o.userId = ? 
+          AND oi.productId = ?
+          AND (o.status = 'completed' OR o.status = 'delivered')
+      ''',
+        [userId, productId],
+      );
+      final cnt = (purchased.first['c'] as num?)?.toInt() ?? 0;
+      if (cnt == 0) {
+        // Nếu muốn cho review tự do thì bỏ block này.
+        throw Exception('Bạn chưa mua sản phẩm này nên không thể đánh giá.');
+      }
+
+      // upsert
+      final existed = await txn.query(
+        'reviews',
+        where: 'userId = ? AND productId = ?',
+        whereArgs: [userId, productId],
+        limit: 1,
+      );
+
+      if (existed.isEmpty) {
+        await txn.insert('reviews', {
+          'userId': userId,
+          'productId': productId,
+          'rating': rating,
+          'comment': comment,
+          'images': images,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      } else {
+        await txn.update(
+          'reviews',
+          {
+            'rating': rating,
+            'comment': comment,
+            'images': images,
+            'createdAt': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [existed.first['id']],
+        );
+      }
+
+      await _updateProductRatingTx(txn, productId);
+    });
   }
 
   static Future<void> addReview({
@@ -1300,7 +1440,42 @@ class DBHelper {
       'comment': comment,
       'images': images,
       'createdAt': DateTime.now().toIso8601String(),
-    });
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await _updateProductRating(productId);
+  }
+
+  static Future<void> updateReview({
+    required int reviewId,
+    required int rating,
+    String? comment,
+    String? images,
+  }) async {
+    final db = await database;
+    final rv = await db.query('reviews', where: 'id = ?', whereArgs: [reviewId]);
+    if (rv.isEmpty) return;
+    final productId = (rv.first['productId'] as num).toInt();
+
+    await db.update(
+      'reviews',
+      {
+        'rating': rating,
+        'comment': comment,
+        'images': images,
+        'createdAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [reviewId],
+    );
+    await _updateProductRating(productId);
+  }
+
+  static Future<void> deleteReview(int reviewId) async {
+    final db = await database;
+    final rv = await db.query('reviews', where: 'id = ?', whereArgs: [reviewId]);
+    if (rv.isEmpty) return;
+    final productId = (rv.first['productId'] as num).toInt();
+
+    await db.delete('reviews', where: 'id = ?', whereArgs: [reviewId]);
     await _updateProductRating(productId);
   }
 
@@ -1320,6 +1495,35 @@ class DBHelper {
       final cnt = (result.first['reviewCount'] as num?)?.toInt() ?? 0;
 
       await db.update(
+        'products',
+        {
+          'rating': avg,
+          'reviewCount': cnt,
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [productId],
+      );
+    }
+  }
+
+  static Future<void> _updateProductRatingTx(
+      Transaction txn,
+      int productId,
+      ) async {
+    final result = await txn.rawQuery(
+      '''
+      SELECT AVG(rating) as avgRating, COUNT(*) as reviewCount 
+      FROM reviews 
+      WHERE productId = ?
+    ''',
+      [productId],
+    );
+    if (result.isNotEmpty) {
+      final avg = (result.first['avgRating'] as num?)?.toDouble() ?? 0.0;
+      final cnt = (result.first['reviewCount'] as num?)?.toInt() ?? 0;
+
+      await txn.update(
         'products',
         {
           'rating': avg,
@@ -1408,7 +1612,7 @@ class DBHelper {
     final existing = await db.query(
       'cart_items',
       where:
-          'userId = ? AND productId = ? AND IFNULL(size, "") = ? AND IFNULL(color, "") = ?',
+      'userId = ? AND productId = ? AND IFNULL(size, "") = ? AND IFNULL(color, "") = ?',
       whereArgs: [userId, productId, sz, cl],
     );
 
@@ -1417,7 +1621,7 @@ class DBHelper {
         'cart_items',
         {
           'quantity':
-              ((existing.first['quantity'] as num?)?.toInt() ?? 0) + quantity,
+          ((existing.first['quantity'] as num?)?.toInt() ?? 0) + quantity,
           'addedAt': DateTime.now().toIso8601String(),
         },
         where: 'id = ?',
@@ -1436,9 +1640,9 @@ class DBHelper {
   }
 
   static Future<void> updateCartItemQuantity(
-    int cartItemId,
-    int quantity,
-  ) async {
+      int cartItemId,
+      int quantity,
+      ) async {
     final db = await database;
     if (quantity <= 0) {
       await db.delete('cart_items', where: 'id = ?', whereArgs: [cartItemId]);
@@ -1543,15 +1747,15 @@ class DBHelper {
         for (final it in items) {
           final price = (it['price'] as num?)?.toDouble() ?? 0;
           final qty = (it['quantity'] as num?)?.toInt() ?? 0;
-          total += price * qty; // ✅ GIÁ SAU GIẢM, KHÔNG TRỪ NỮA
+          total += price * qty;
         }
 
         final orderCode = 'DH${DateTime.now().millisecondsSinceEpoch}';
         final orderId = await txn.insert('orders', {
           'userId': userId,
           'orderCode': orderCode,
-          'totalAmount': total.toDouble(), // ✅ Tổng tiền cuối cùng
-          'discountAmount': 0, // ❌ Không trừ thêm giảm giá nữa
+          'totalAmount': total.toDouble(),
+          'discountAmount': 0,
           'finalAmount': total.toDouble(),
           'status': 'pending',
           'paymentMethod': paymentMethod,
@@ -1575,7 +1779,7 @@ class DBHelper {
             'quantity': qty,
             'size': it['size'],
             'color': it['color'],
-            'discount': 0, // ✅ vì giá đã bao gồm giảm
+            'discount': 0,
             'totalPrice': (price * qty).toDouble(),
           });
         }
@@ -1594,7 +1798,6 @@ class DBHelper {
   static Future<void> completeOrder(int orderId) async {
     final db = await database;
     await db.transaction((txn) async {
-      // Cập nhật trạng thái đơn
       await txn.update(
         'orders',
         {'status': 'completed', 'updatedAt': DateTime.now().toIso8601String()},
@@ -1602,14 +1805,12 @@ class DBHelper {
         whereArgs: [orderId],
       );
 
-      // Lấy các sản phẩm trong đơn
       final items = await txn.query(
         'order_items',
         where: 'orderId = ?',
         whereArgs: [orderId],
       );
 
-      // Trừ số lượng từng sản phẩm
       for (final it in items) {
         final productId = (it['productId'] as num).toInt();
         final quantity = (it['quantity'] as num).toInt();
@@ -1641,8 +1842,8 @@ class DBHelper {
   // 18️⃣ QUẢN LÝ ĐỊA CHỈ GIAO HÀNG
   // =============================
   static Future<List<Map<String, dynamic>>> getAddressesByUser(
-    int userId,
-  ) async {
+      int userId,
+      ) async {
     final db = await database;
     return db.query(
       'shipping_addresses',
@@ -1682,7 +1883,6 @@ class DBHelper {
         whereArgs: [userId],
       );
     } else {
-      // nếu user chưa có địa chỉ mặc định, set mặc định cho địa chỉ đầu tiên
       final cnt = Sqflite.firstIntValue(
         await db.rawQuery(
           'SELECT COUNT(*) FROM shipping_addresses WHERE userId = ? AND isDefault = 1',
@@ -1776,10 +1976,9 @@ class DBHelper {
   // 🧩 BỔ SUNG HÀM PHỤC VỤ MÀN HÌNH ĐƠN HÀNG
   // =============================
 
-  /// Lấy danh sách đơn của user (kèm tổng số lượng, ảnh sản phẩm đầu tiên)
   static Future<List<Map<String, dynamic>>> getOrdersByUserSummary(
-    int userId,
-  ) async {
+      int userId,
+      ) async {
     final db = await database;
     final res = await db.rawQuery(
       '''
@@ -1812,7 +2011,6 @@ class DBHelper {
     return res;
   }
 
-  /// Lấy chi tiết 1 đơn (gồm sản phẩm có ảnh, size, màu, note, payment)
   static Future<Map<String, dynamic>?> getOrderDetail(int orderId) async {
     final db = await database;
     final orders = await db.query(
@@ -1837,7 +2035,6 @@ class DBHelper {
     return {'order': orders.first, 'items': items};
   }
 
-  /// Hủy đơn (chuyển sang trạng thái cancelled)
   static Future<void> cancelOrder(int orderId) async {
     final db = await database;
     await db.update(
@@ -1848,13 +2045,11 @@ class DBHelper {
     );
   }
 
-  /// Xóa đơn (order_items sẽ tự xóa nhờ ON DELETE CASCADE)
   static Future<void> deleteOrder(int orderId) async {
     final db = await database;
     await db.delete('orders', where: 'id = ?', whereArgs: [orderId]);
   }
 
-  /// Thêm lại toàn bộ sản phẩm của đơn vào giỏ hàng user
   static Future<void> addOrderBackToCart({
     required int userId,
     required int orderId,

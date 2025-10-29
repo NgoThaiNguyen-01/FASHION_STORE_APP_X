@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../login_screen.dart';
 import './manage_orders_screen.dart';
 import './manage_users_screen.dart';
-import '../account_screen.dart';
+import './manage_products_screen.dart';
 import '../../database/db_helper.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -36,28 +38,95 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       setState(() => stats = data);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi tải thống kê: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tải thống kê: $e')),
+        );
       }
     } finally {
       setState(() => isLoading = false);
     }
   }
 
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận'),
+        content: const Text('Bạn có chắc muốn đăng xuất?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã đăng xuất thành công'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // đợi 0.6s cho snackbar hiển thị
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      // 🔁 Quay về màn hình login_screen.dart
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Quản trị viên'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Quản trị viên'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Đăng xuất',
+          ),
+        ],
+      ),
       body: _buildCurrentScreen(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          if (_currentIndex == index && index == 0) {
+            _loadStatistics(); // reload thống kê khi chọn lại tab đầu
+          }
+          setState(() => _currentIndex = index);
+        },
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Thống kê',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory),
+            label: 'Sản phẩm',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),
@@ -66,10 +135,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.people),
             label: 'Khách hàng',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_circle),
-            label: 'Tài khoản',
           ),
         ],
       ),
@@ -81,28 +146,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       case 0:
         return _buildStatisticsScreen();
       case 1:
-        return const ManageOrdersScreen();
+        return const ManageProductsScreen();
       case 2:
-        return const ManageUsersScreen();
+        return ManageOrdersScreen(onRefresh: _loadStatistics);
       case 3:
-        return FutureBuilder<Map<String, dynamic>?>(
-          future: DBHelper.getUserById(widget.userId),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Lỗi tải thông tin: ${snapshot.error}'),
-              );
-            }
-            final user = snapshot.data;
-            if (user == null) {
-              return const Center(child: Text('Không tìm thấy thông tin'));
-            }
-            return AccountScreen(user: user);
-          },
-        );
+        return const ManageUsersScreen();
       default:
         return _buildStatisticsScreen();
     }
@@ -158,6 +206,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Widget _buildStatisticsCard(String title, List<Widget> items) {
     return Card(
+      color: Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

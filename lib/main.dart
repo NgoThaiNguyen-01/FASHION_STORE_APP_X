@@ -7,8 +7,13 @@ import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/wishlist_screen.dart';
+import 'database/db_helper.dart';
 
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DBHelper.database;
+  await DBHelper.logDbPath();
   runApp(const UngDungThoiTrangTn());
 }
 

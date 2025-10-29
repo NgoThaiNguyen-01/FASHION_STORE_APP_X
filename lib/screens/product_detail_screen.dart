@@ -111,7 +111,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final id = asInt(widget.product['id']);
     final reviews = await DBHelper.getProductReviews(id);
     if (!mounted) return;
-    setState(() => _reviews = reviews);
+    setState(() {
+      _reviews = reviews;
+      _recalcRatingFromReviews();
+    });
+  }
+
+  void _recalcRatingFromReviews() {
+    if (_reviews.isEmpty) {
+      // giữ nguyên rating mặc định từ product khi chưa có review
+      _reviewCount = 0;
+      return;
+    }
+    final nums = _reviews
+        .map((r) => asInt(r['rating']))
+        .where((v) => v >= 1 && v <= 5)
+        .map((v) => v.toDouble())
+        .toList();
+    if (nums.isEmpty) {
+      _reviewCount = 0;
+      return;
+    }
+    final sum = nums.fold<double>(0, (a, b) => a + b);
+    _reviewCount = nums.length;
+    _rating = double.parse((sum / nums.length).toStringAsFixed(1));
   }
 
   Future<void> _checkIfFavorite() async {
@@ -511,12 +534,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Đánh giá sản phẩm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Đánh giá sản phẩm',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Viết đánh giá'),
+                onPressed: _showReviewDialog,
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (_reviews.isEmpty)
             const Center(child: Text('Chưa có đánh giá nào', style: TextStyle(color: Colors.grey)))
           else
             Column(children: _reviews.map((r) => _buildReviewItem(r)).toList()),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showReviewDialog() async {
+    final rating = ValueNotifier<double>(5);
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Đánh giá sản phẩm'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ValueListenableBuilder<double>(
+              valueListenable: rating,
+              builder: (_, v, __) => Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                      (i) => IconButton(
+                    icon: Icon(
+                      Icons.star,
+                      color: i < v ? Colors.amber : Colors.grey,
+                    ),
+                    onPressed: () => rating.value = (i + 1).toDouble(),
+                  ),
+                ),
+              ),
+            ),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Nhập nhận xét của bạn...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () async {
+              await DBHelper.addReview(
+                userId: widget.userId,
+                productId: asInt(widget.product['id']),
+                rating: rating.value.toInt(),
+                comment: controller.text.trim(),
+              );
+              if (!mounted) return;
+              Navigator.pop(context);
+              _snack('Đã gửi đánh giá thành công!');
+              await _loadReviews();
+            },
+            child: const Text('Gửi'),
+          ),
         ],
       ),
     );
@@ -570,7 +664,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     mainAxisSize: MainAxisSize.min,
     children: List.generate(
       5,
-          (i) => Icon(Icons.star, size: 16, color: i < rating.floor() ? Colors.amber : Colors.grey[300]),
+          (i) => Icon(Icons.star,
+          size: 16, color: i < rating.floor() ? Colors.amber : Colors.grey[300]),
     ),
   );
 
@@ -638,7 +733,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     Expanded(
                       child: FilledButton(
                         onPressed: isOutOfStock ? null : _buyNow,
-                        child: Text('Mua ngay'),
+                        child: const Text('Mua ngay'),
                       ),
                     ),
                   ],
@@ -831,8 +926,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(subtitle, style: const TextStyle(color: Colors.black54)),
               ],

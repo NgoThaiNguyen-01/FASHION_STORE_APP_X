@@ -17,6 +17,7 @@ class _OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _loading = true;
+
   Map<String, List<Map<String, dynamic>>> orders = {
     'pending': [],
     'completed': [],
@@ -33,9 +34,14 @@ class _OrdersScreenState extends State<OrdersScreen>
   Future<void> _loadOrders() async {
     setState(() => _loading = true);
     final res = await DBHelper.getOrdersByUserSummary(widget.userId);
+
     orders = {
-      'pending': res.where((e) => e['status'] == 'pending').toList(),
-      'completed': res.where((e) => e['status'] == 'completed').toList(),
+      'pending': res
+          .where((e) => e['status'] == 'pending' || e['status'] == 'processing')
+          .toList(),
+      'completed': res
+          .where((e) => e['status'] == 'completed' || e['status'] == 'delivered')
+          .toList(),
       'cancelled': res.where((e) => e['status'] == 'cancelled').toList(),
     };
     setState(() => _loading = false);
@@ -46,18 +52,23 @@ class _OrdersScreenState extends State<OrdersScreen>
           .format(v);
 
   Color _statusColor(String s) {
-    if (s == 'completed') return Colors.green;
+    if (s == 'completed' || s == 'delivered') return Colors.green;
     if (s == 'cancelled') return Colors.red;
     return Colors.orange;
   }
 
   String _statusText(String s) {
-    if (s == 'completed') return 'Hoàn tất';
-    if (s == 'cancelled') return 'Đã hủy';
-    return 'Đang xử lý';
+    switch (s) {
+      case 'completed':
+      case 'delivered':
+        return 'Hoàn tất';
+      case 'cancelled':
+        return 'Đã hủy';
+      default:
+        return 'Đang xử lý';
+    }
   }
 
-  // === HÀM XỬ LÝ ẢNH ===
   List<String> _parseImageList(dynamic raw) {
     try {
       if (raw == null) return [];
@@ -74,8 +85,10 @@ class _OrdersScreenState extends State<OrdersScreen>
           width: w, height: h, fit: BoxFit.cover);
     }
     final imgs = _parseImageList(imageJson);
-    final path =
-    imgs.isNotEmpty ? imgs.first : 'assets/images/anh_macdinh_sanpham_chuachonanh.png';
+    final path = imgs.isNotEmpty
+        ? imgs.first
+        : 'assets/images/anh_macdinh_sanpham_chuachonanh.png';
+
     if (path.startsWith('assets/')) {
       return Image.asset(path, width: w, height: h, fit: BoxFit.cover);
     } else if (path.startsWith('http')) {
@@ -94,9 +107,8 @@ class _OrdersScreenState extends State<OrdersScreen>
   Widget _buildOrderCard(Map<String, dynamic> o) {
     final finalAmount = (o['finalAmount'] as num?)?.toDouble() ?? 0;
     final itemsCount = (o['itemsCount'] as num?)?.toInt() ?? 0;
-    final note = o['note'] ?? '';
-    final pay = o['paymentMethod'] ?? 'Chưa rõ';
-    final status = o['status'] ?? 'pending';
+    final pay = (o['paymentMethod'] ?? 'Chưa rõ').toString();
+    final status = (o['status'] ?? 'pending').toString();
     final firstImage = o['firstImage']?.toString() ?? '';
 
     return Card(
@@ -108,7 +120,7 @@ class _OrdersScreenState extends State<OrdersScreen>
           child: _imageOf(firstImage, w: 55, h: 55),
         ),
         title: Text(
-          'Đơn ${o['orderCode']}',
+          'Đơn ${o['orderCode'] ?? ''}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
@@ -118,23 +130,24 @@ class _OrdersScreenState extends State<OrdersScreen>
                 style: const TextStyle(fontWeight: FontWeight.w500)),
             Text('Thanh toán: ${pay.toUpperCase()}',
                 style: const TextStyle(color: Colors.black54)),
-            if (note.toString().isNotEmpty)
-              Text('Ghi chú: $note',
-                  style: const TextStyle(color: Colors.black54)),
             const SizedBox(height: 4),
             GestureDetector(
               onTap: () async {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        OrderDetailScreen(orderId: o['id']),
+                    builder: (_) => OrderDetailScreen(
+                      orderId: o['id'],      // ✅ orderId
+                      userId: widget.userId, // ✅ userId truyền đúng
+                    ),
                   ),
                 );
-                _loadOrders();
+                _loadOrders(); // refresh sau khi trở lại
               },
-              child: const Text('Xem chi tiết',
-                  style: TextStyle(color: Colors.blueAccent)),
+              child: const Text(
+                'Xem chi tiết',
+                style: TextStyle(color: Colors.blueAccent),
+              ),
             ),
           ],
         ),
@@ -174,12 +187,15 @@ class _OrdersScreenState extends State<OrdersScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Đơn hàng của tôi',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Đơn hàng của tôi',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.orange,
           unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.orange,
           tabs: const [
             Tab(text: 'Đang xử lý'),
             Tab(text: 'Hoàn tất'),

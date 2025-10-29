@@ -14,6 +14,7 @@ import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'account_screen.dart';
 import 'admin/admin_home_screen.dart';
+import '../widgets/ai_chat_box.dart';
 
 class HomeScreen extends StatefulWidget {
   final String fullName;
@@ -1101,6 +1102,18 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: _buildAppBar(),
       body: _buildCurrentScreen(),
       bottomNavigationBar: _buildBottomNavigationBar(),
+
+      // 👉 Nút tròn AI nổi
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.deepPurple,
+        child: const Icon(Icons.smart_toy),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiChatBox()),
+          );
+        },
+      ),
     );
   }
 
@@ -1145,23 +1158,15 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return _buildWishlistScreen();
       case 3:
-        // Tải thông tin người dùng hiện tại từ database
         return FutureBuilder<Map<String, dynamic>?>(
           future: DBHelper.getUserById(widget.userId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Lỗi khi tải tài khoản: ${snapshot.error}'),
-              );
-            }
             final user = snapshot.data;
             if (user == null) {
-              return const Center(
-                child: Text('Không tìm thấy thông tin người dùng'),
-              );
+              return const Center(child: Text('Không tìm thấy thông tin người dùng'));
             }
             return AccountScreen(user: user);
           },
@@ -1389,27 +1394,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ======= Các block UI con =======
   Widget _buildGreeting() {
-    return Row(
-      children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/anh_avata_macdinh.png'),
-          radius: 22,
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
-              'Xin chào 👋',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: DBHelper.getUserById(widget.userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 50,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final user = snapshot.data;
+        final avatarPath = user?['avatar'] as String?;
+        final fullName = user?['fullName'] ?? widget.fullName;
+
+        return Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: (avatarPath != null && avatarPath.isNotEmpty)
+                  ? FileImage(File(avatarPath))
+                  : const AssetImage('assets/images/anh_avata_macdinh.png')
+              as ImageProvider,
+              radius: 22,
             ),
-            Text(
-              'Chúc bạn một ngày tốt lành!',
-              style: TextStyle(color: Colors.grey),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Xin chào, $fullName 👋',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const Text(
+                  'Chúc bạn một ngày tốt lành!',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1951,4 +1977,6 @@ class _HomeScreenState extends State<HomeScreen> {
     color: Colors.grey[200],
     child: const Center(child: Icon(Icons.photo, size: 40, color: Colors.grey)),
   );
+
+
 }
